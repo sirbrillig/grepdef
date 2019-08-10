@@ -1,0 +1,22 @@
+{
+  "name": "grepdef",
+  "version": "1.0.0",
+  "description": "A command-line tool to search for symbol definitions in various programming languages",
+  "main": "index.jsm",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Payton Swick <payton@foolord.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^6.1.0",
+    "prettier": "^1.18.2"
+  },
+  "dependencies": {
+    "chalk": "^2.4.2",
+    "minimist": "^1.2.0"
+  },
+  "bin": {
+    "grepdef": "bin/grepdef"
+  }
+}
