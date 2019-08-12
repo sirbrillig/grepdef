@@ -5,8 +5,8 @@ const childProcess = require('child_process');
 
 const exec = util.promisify(childProcess.exec);
 
-async function searchWithRegexp({ regexp, type, verbose }) {
-	const command = `rg --type ${type} --json '${regexp}'`;
+async function searchWithRegexp({ regexp, type, path, verbose }) {
+	const command = `rg --type ${type} --json '${regexp}' ${path}`;
 	try {
 		verbose && console.log('command:', command);
 		const { stdout } = await exec(command);

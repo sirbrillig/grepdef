@@ -6,9 +6,9 @@ const getPhpRegexp = require('./src/lang/php.js');
 const searchWithRegexp = require('./src/searchers/ripgrep.js');
 const humanOutput = require('./src/reporters/human.js');
 
-async function search({ symbol, type, verbose, reporterName }) {
+async function search({ symbol, type, verbose, reporterName, path }) {
 	const regexp = getRegexpForType(symbol, type);
-	const results = await searchWithRegexp({ regexp, type, verbose });
+	const results = await searchWithRegexp({ regexp, type, verbose, path });
 	getReporterForReporterName(reporterName)(results);
 }
 
@@ -37,16 +37,21 @@ async function main(args) {
 	const langType = options.type;
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
+	const path = options._[1] || '.';
 	if (!searchSymbol) {
 		console.error('No search symbol provided.');
 		process.exit(1);
 	}
-	search({ symbol: searchSymbol, type: langType, verbose: !!options.verbose, reporterName }).catch(
-		error => {
-			console.error(error.message);
-			process.exit(1);
-		}
-	);
+	search({
+		symbol: searchSymbol,
+		type: langType,
+		verbose: !!options.verbose,
+		reporterName,
+		path,
+	}).catch(error => {
+		console.error(error.message);
+		process.exit(1);
+	});
 }
 
 module.exports = main;
