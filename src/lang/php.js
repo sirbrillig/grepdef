@@ -5,7 +5,7 @@ function getRegexp(symbol) {
 		const symbolWithoutDollar = symbol.substring(1);
 		return `\\$\\b${symbolWithoutDollar}\\b`;
 	}
-	return `\\bfunction ${symbol}\\b`;
+	return `\\b(function|class) ${symbol}\\b`;
 }
 
 module.exports = getRegexp;
