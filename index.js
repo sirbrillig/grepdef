@@ -23,6 +23,19 @@ function getRegexpForType(symbol, type) {
 	}
 }
 
+function normalizeType(type) {
+	switch (type) {
+		case 'javascript':
+		case 'javascript.jsx':
+		case 'js':
+			return 'js';
+		case 'php':
+			return 'php';
+		default:
+			throw new Error('Unknown language type');
+	}
+}
+
 function getReporterForReporterName(type) {
 	switch (type) {
 		case 'human':
@@ -44,7 +57,7 @@ async function main(args) {
 	}
 	search({
 		symbol: searchSymbol,
-		type: langType,
+		type: normalizeType(langType),
 		verbose: !!options.verbose,
 		reporterName,
 		path,
