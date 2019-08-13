@@ -3,13 +3,22 @@
 const minimist = require('minimist');
 const getJsRegexp = require('./src/lang/js.js');
 const getPhpRegexp = require('./src/lang/php.js');
-const searchWithRegexp = require('./src/searchers/ripgrep.js');
+const ripgrepSearch = require('./src/searchers/ripgrep.js');
 const humanOutput = require('./src/reporters/human.js');
 
-async function search({ symbol, type, verbose, reporterName, path }) {
+async function search({ symbol, type, verbose, reporterName, searchTool, path }) {
 	const regexp = getRegexpForType(symbol, type);
-	const results = await searchWithRegexp({ regexp, type, verbose, path });
+	const results = await getSearchToolForSearcherName(searchTool)({ regexp, type, verbose, path });
 	getReporterForReporterName(reporterName)(results);
+}
+
+function getSearchToolForSearcherName(name) {
+	switch (name) {
+		case 'ripgrep':
+			return ripgrepSearch;
+		default:
+			throw new Error('Unknown search tool');
+	}
 }
 
 function getRegexpForType(symbol, type) {
@@ -68,6 +77,7 @@ should be easier than a grep by itself.
 async function main(args) {
 	const options = minimist(args);
 	const langType = options.type;
+	const searchTool = options.searcher || 'ripgrep';
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
 	const path = options._[1] || '.';
@@ -87,6 +97,7 @@ async function main(args) {
 		type: normalizeType(langType),
 		verbose: !!options.verbose,
 		reporterName,
+		searchTool,
 		path,
 	}).catch(error => {
 		console.error(error.message);
