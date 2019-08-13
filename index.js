@@ -41,7 +41,7 @@ function normalizeType(type) {
 		case 'php':
 			return 'php';
 		default:
-			throw new Error('Unknown language type');
+			return null;
 	}
 }
 
