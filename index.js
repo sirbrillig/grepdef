@@ -58,13 +58,16 @@ function printHelp() {
 	const helpText = `
 grepdef: search for symbol definitions in various programming languages
 
-Usage: grepdef --type <type> <symbol>
+Usage: grepdef --type <type> <symbol> [path]
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
 those strings (eg: 'javascript.jsx').
 
 The symbol is the full string name of a class, function, variable, or similar
 construct.
+
+If a search path is not provided, this will search starting from the current
+directory.
 
 The output is like using grep, but will only show places where that symbol is
 defined (no partial matches, variable uses, or function calls). The search uses
