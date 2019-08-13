@@ -45,15 +45,42 @@ function getReporterForReporterName(type) {
 	}
 }
 
+function printHelp() {
+	const helpText = `
+grepdef: search for symbol definitions in various programming languages
+
+Usage: grepdef --type <type> <symbol>
+
+The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
+those strings (eg: 'javascript.jsx').
+
+The symbol is the full string name of a class, function, variable, or similar
+construct.
+
+The output is like using grep, but will only show places where that symbol is
+defined (no partial matches, variable uses, or function calls). The search uses
+a regular expression so it is unaware of scope and is far from fullproof, but
+should be easier than a grep by itself.
+	`;
+	console.log(helpText);
+}
+
 async function main(args) {
 	const options = minimist(args);
 	const langType = options.type;
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
 	const path = options._[1] || '.';
+	if (options.h || options.help) {
+		printHelp();
+		process.exit(0);
+		return;
+	}
 	if (!searchSymbol) {
 		console.error('No search symbol provided.');
+		printHelp();
 		process.exit(1);
+		return;
 	}
 	search({
 		symbol: searchSymbol,
@@ -63,6 +90,7 @@ async function main(args) {
 		path,
 	}).catch(error => {
 		console.error(error.message);
+		printHelp();
 		process.exit(1);
 	});
 }
