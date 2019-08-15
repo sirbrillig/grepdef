@@ -1,4 +1,6 @@
-grepdef: search for symbol definitions in various programming languages
+# grepdef
+
+A cli tool to search for symbol definitions in various programming languages
 
 ```
 Usage: grepdef --type <type> <symbol> [path]
