@@ -18,5 +18,16 @@
   },
   "bin": {
     "grepdef": "bin/grepdef"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sirbrillig/grepdef.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sirbrillig/grepdef/issues"
+  },
+  "homepage": "https://github.com/sirbrillig/grepdef#readme"
 }
