@@ -28,3 +28,7 @@ This tool is a node script, so you must have [node](https://nodejs.org/en/) inst
 ```
 npm install -g @sirbrillig/grepdef
 ```
+
+## Using with vim
+
+See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
