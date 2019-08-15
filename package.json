@@ -1,5 +1,5 @@
 {
-  "name": "grepdef",
+  "name": "@sirbrillig/grepdef",
   "version": "1.0.0",
   "description": "A command-line tool to search for symbol definitions in various programming languages",
   "main": "index.js",
