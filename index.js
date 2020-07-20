@@ -36,6 +36,7 @@ function normalizeType(type) {
 	switch (type) {
 		case 'javascript':
 		case 'javascript.jsx':
+		case 'javascriptreact':
 		case 'typescript':
 		case 'js':
 			return 'js';
