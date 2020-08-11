@@ -22,32 +22,40 @@ const humanOutput = require('./reporters/human.js');
 
 /**
  * @typedef {object} SearchConfig
- * @property {string} symbol - the symbol to search for
  * @property {FileType} type
- * @property {boolean} verbose
+ * @property {boolean} [verbose]
  * @property {SearchTool} searchTool
  * @property {Glob} path
  */
 
 /**
+ * @typedef {object} SearchResult
+ * @property {string} path
+ * @property {number} line
+ * @property {string} text
+ */
+
+/**
+ * @param {string} symbol - the symbol to search for
  * @param {SearchConfig} config
  * @param {ReporterType} reporterName
  * @returns void
  */
-async function searchAndReport({ symbol, type, verbose, searchTool, path }, reporterName) {
-	const results = await search({ symbol, type, verbose, searchTool, path })
+async function searchAndReport(symbol, { type, verbose, searchTool, path }, reporterName) {
+	const results = await search(symbol, { type, verbose, searchTool, path });
 	const reporter = getReporterForReporterName(reporterName);
 	reporter(results);
 }
 
 /**
+ * @param {string} symbol - the symbol to search for
  * @param {SearchConfig} config
- * @returns void
+ * @returns {Promise<SearchResult[]>}
  */
-async function search({ symbol, type, verbose, searchTool, path }) {
+async function search(symbol, { type, verbose, searchTool, path }) {
 	const regexp = getRegexpForType(symbol, type);
 	const searcher = getSearchToolForSearcherName(searchTool);
-	return searcher({ regexp, type, verbose, path });
+	return searcher(regexp, { type, verbose, searchTool, path });
 }
 
 /**

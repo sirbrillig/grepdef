@@ -1,11 +1,21 @@
 // @format
+// @ts-check
 
 const util = require('util');
 const childProcess = require('child_process');
 
 const exec = util.promisify(childProcess.exec);
 
-async function searchWithRegexp({ regexp, type, path, verbose }) {
+/**
+ * @typedef {import('../general').SearchResult} SearchResult
+ */
+
+/**
+ * @param {string} regexp - the regexp to search for
+ * @param {import('../general').SearchConfig} config
+ * @returns {Promise<SearchResult[]>}
+ */
+async function searchWithRegexp(regexp, { type, path, verbose }) {
 	const fileTypes = ['js', 'ts'].includes(type) ? ['js', 'ts'] : [type];
 	const typeOptions = fileTypes.map(fileType => `--type ${fileType}`).join(' ');
 	const command = `rg ${typeOptions} --json '${regexp}' ${path}`;
@@ -18,15 +28,35 @@ async function searchWithRegexp({ regexp, type, path, verbose }) {
 	}
 }
 
+/**
+ * @param {string} output
+ * @returns {SearchResult[]}
+ */
 function searchOutputToArray(output) {
-	const outputLines = output
+	return output
 		.split(/\n/)
 		.filter(line => isProbablyValidJson(line))
-		.map(line => JSON.parse(line));
-	const matches = outputLines.filter(line => line.type === 'match');
-	return matches;
+		.map(line => JSON.parse(line))
+		.filter(line => line.type === 'match')
+		.map(convertRipGrepToSearchResult);
 }
 
+/**
+ * @param {object} ripgrepResult
+ * @returns {SearchResult}
+ */
+function convertRipGrepToSearchResult(ripgrepResult) {
+	return {
+		path: ripgrepResult.data.path.text,
+		line: ripgrepResult.data.line_number,
+		text: ripgrepResult.data.lines.text.trim(),
+	};
+}
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
 function isProbablyValidJson(text) {
 	return text.length > 1 && text[0] === '{' && text[text.length - 1] === '}';
 }

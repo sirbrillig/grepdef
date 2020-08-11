@@ -1,12 +1,15 @@
 // @format
+// @ts-check
 
 const chalk = require('chalk');
 
+/**
+ * @param {import('../searchers/ripgrep').SearchResult[]} results
+ * @return void
+ */
 function outputResults(results) {
 	const messages = results.map(match => {
-		const { data } = match;
-		const { path, lines, line_number } = data;
-		return `${chalk.magenta(path.text)}:${chalk.green(line_number)}:${lines.text.trim()}`;
+		return `${chalk.default.magenta(match.path)}:${chalk.default.green(match.line)}:${match.text}`;
 	});
 	messages.map(message => console.log(message));
 }

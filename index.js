@@ -46,8 +46,8 @@ async function grepdef(args) {
 		return;
 	}
 	searchAndReport(
+		searchSymbol,
 		{
-			symbol: searchSymbol,
 			type: normalizeType(langType),
 			verbose: !!options.verbose,
 			searchTool,
