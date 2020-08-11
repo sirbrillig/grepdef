@@ -1,7 +1,7 @@
-// @format
+// @ts-check
 
 const minimist = require('minimist');
-const { search, normalizeType } = require('./src/general.js');
+const { searchAndReport, normalizeType } = require('./src/general.js');
 
 function printHelp() {
 	const helpText = `
@@ -45,14 +45,16 @@ async function grepdef(args) {
 		process.exit(1);
 		return;
 	}
-	search({
-		symbol: searchSymbol,
-		type: normalizeType(langType),
-		verbose: !!options.verbose,
-		reporterName,
-		searchTool,
-		path,
-	}).catch(error => {
+	searchAndReport(
+		{
+			symbol: searchSymbol,
+			type: normalizeType(langType),
+			verbose: !!options.verbose,
+			searchTool,
+			path,
+		},
+		reporterName
+	).catch(error => {
 		console.error(error.message);
 		printHelp();
 		process.exit(1);
