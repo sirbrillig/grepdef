@@ -2,16 +2,22 @@
 const { search } = require('../src/general');
 
 describe.each([
-	['queryDb', 1],
-	['makeQuery', 3],
-	['parseQuery', 5],
-	['objectWithFunctionShorthand', 9],
-	['shorthandFunction', 10],
-])("search('%s')", (symbol, expectedLine) => {
+	['queryDb', 'js', 1],
+	['makeQuery', 'js', 3],
+	['parseQuery', 'js', 5],
+	['objectWithFunctionShorthand', 'js', 9],
+	['shorthandFunction', 'js', 10],
+	['queryDb', 'php', 2],
+	['$makeQuery', 'php', 4],
+	['parseQuery', 'php', 6],
+	['Foo', 'php', 11],
+	['Bar', 'php', 14],
+	['Zoom', 'php', 17],
+])("search('%s', {type: '%s'})", (symbol, type, expectedLine) => {
 	test(`finds line '${expectedLine}'`, async () => {
-		const path = './tests/fixtures/js/db.js';
+		const path = getFixtureForType(type);
 		const config = {
-			type: 'js',
+			type,
 			searchTool: 'ripgrep',
 			path,
 		};
@@ -23,3 +29,18 @@ describe.each([
 		expect(result.text).toBeDefined();
 	});
 });
+
+/**
+ * @param {import('../src/general').FileType} type
+ * @returns {string} path
+ */
+function getFixtureForType(type) {
+	switch (type) {
+		case 'js':
+			return './tests/fixtures/js/db.js';
+		case 'php':
+			return './tests/fixtures/php/db.php';
+		default:
+			throw new Error(`Could not find fixture for type '${type}'`);
+	}
+}
