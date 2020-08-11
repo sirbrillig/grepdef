@@ -1,60 +1,7 @@
 // @format
 
 const minimist = require('minimist');
-const getJsRegexp = require('./src/lang/js.js');
-const getPhpRegexp = require('./src/lang/php.js');
-const ripgrepSearch = require('./src/searchers/ripgrep.js');
-const humanOutput = require('./src/reporters/human.js');
-
-async function search({ symbol, type, verbose, reporterName, searchTool, path }) {
-	const regexp = getRegexpForType(symbol, type);
-	const results = await getSearchToolForSearcherName(searchTool)({ regexp, type, verbose, path });
-	getReporterForReporterName(reporterName)(results);
-}
-
-function getSearchToolForSearcherName(name) {
-	switch (name) {
-		case 'ripgrep':
-			return ripgrepSearch;
-		default:
-			throw new Error('Unknown search tool');
-	}
-}
-
-function getRegexpForType(symbol, type) {
-	switch (type) {
-		case 'js':
-			return getJsRegexp(symbol);
-		case 'php':
-			return getPhpRegexp(symbol);
-		default:
-			throw new Error('Unknown language type');
-	}
-}
-
-function normalizeType(type) {
-	switch (type) {
-		case 'javascript':
-		case 'javascript.jsx':
-		case 'javascriptreact':
-		case 'typescript':
-		case 'js':
-			return 'js';
-		case 'php':
-			return 'php';
-		default:
-			return null;
-	}
-}
-
-function getReporterForReporterName(type) {
-	switch (type) {
-		case 'human':
-			return humanOutput;
-		default:
-			throw new Error('Unknown reporter type');
-	}
-}
+const { search, normalizeType } = require('./src/general.js');
 
 function printHelp() {
 	const helpText = `
@@ -63,7 +10,8 @@ grepdef: search for symbol definitions in various programming languages
 Usage: grepdef --type <type> <symbol> [path]
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
-those strings (eg: 'javascript.jsx').
+those strings (eg: 'javascript.jsx'). Typescript is currently considered part
+of JavaScript so a type of 'typescript' is equivalent to 'js'.
 
 The symbol is the full string name of a class, function, variable, or similar
 construct.
@@ -79,7 +27,7 @@ should be easier than a grep by itself.
 	console.log(helpText);
 }
 
-async function main(args) {
+async function grepdef(args) {
 	const options = minimist(args);
 	const langType = options.type;
 	const searchTool = options.searcher || 'ripgrep';
@@ -111,4 +59,4 @@ async function main(args) {
 	});
 }
 
-module.exports = main;
+module.exports = grepdef;

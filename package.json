@@ -4,12 +4,14 @@
   "description": "A command-line tool to search for symbol definitions in various programming languages",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "author": "Payton Swick <payton@foolord.com>",
   "license": "MIT",
   "devDependencies": {
     "eslint": "^6.1.0",
+    "eslint-plugin-jest": "^23.20.0",
+    "jest": "^26.3.0",
     "prettier": "^1.18.2"
   },
   "dependencies": {
@@ -30,5 +32,7 @@
     "url": "https://github.com/sirbrillig/grepdef/issues"
   },
   "homepage": "https://github.com/sirbrillig/grepdef#readme",
-  "publishConfig": { "registry": "https://npm.pkg.github.com/" }
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  }
 }
