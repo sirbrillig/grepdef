@@ -9,7 +9,7 @@ const chalk = require('chalk');
  */
 function outputResults(results) {
 	const messages = results.map(match => {
-		return `${chalk.default.magenta(match.path)}:${chalk.default.green(match.line)}:${match.text}`;
+		return `${chalk.default.magenta(match.path)}:${chalk.default.green(String(match.line))}:${match.text}`;
 	});
 	messages.map(message => console.log(message));
 }
