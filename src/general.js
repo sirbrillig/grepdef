@@ -21,6 +21,14 @@ const humanOutput = require('./reporters/human.js');
  */
 
 /**
+ * @typedef {(arg: SearchResult[]) => void} ReporterFunction
+ */
+
+/**
+ * @typedef {(regexp: string, config: SearchConfig) => Promise<SearchResult[]>} SearchFunction
+ */
+
+/**
  * @typedef {object} SearchConfig
  * @property {FileType} type
  * @property {boolean} [verbose]
@@ -60,7 +68,7 @@ async function search(symbol, { type, verbose, searchTool, path }) {
 
 /**
  * @param {SearchTool} name
- * @returns {function}
+ * @returns {SearchFunction}
  */
 function getSearchToolForSearcherName(name) {
 	switch (name) {
@@ -108,7 +116,7 @@ function normalizeType(type) {
 
 /**
  * @param {ReporterType} type
- * @returns {function}
+ * @returns {ReporterFunction}
  */
 function getReporterForReporterName(type) {
 	switch (type) {
