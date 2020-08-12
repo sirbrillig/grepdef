@@ -105,6 +105,7 @@ function normalizeType(type) {
 		case 'javascript.jsx':
 		case 'javascriptreact':
 		case 'typescript':
+		case 'typescript.tsx':
 		case 'js':
 			return 'js';
 		case 'php':
