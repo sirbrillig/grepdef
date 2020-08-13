@@ -8,6 +8,8 @@ describe.each([
 	['objectWithFunctionShorthand', 'js', 'js', 9],
 	['shorthandFunction', 'js', 'js', 10],
 	['shorthandFunction', undefined, 'js', 10], // auto-detect type
+	['shorthandFunction', undefined, 'js_2_files', 10], // auto_detect type
+	['shorthandFunction', undefined, 'js_glob_files', 10], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
@@ -15,7 +17,7 @@ describe.each([
 	['Bar', 'php', 'php', 14],
 	['Zoom', 'php', 'php', 17],
 	['Zoom', undefined, 'php', 17], // auto-detect type
-])("search('%s', {type: '%s'})", (symbol, type, fixtureType, expectedLine) => {
+])("search('%s', {type: '%s', path: '%s'})", (symbol, type, fixtureType, expectedLine) => {
 	test(`finds line '${expectedLine}'`, async () => {
 		const path = getFixtureForType(fixtureType);
 		const config = {
@@ -40,6 +42,10 @@ function getFixtureForType(type) {
 	switch (type) {
 		case 'js':
 			return './tests/fixtures/js/db.js';
+		case 'js_2_files':
+			return './tests/fixtures/js/db.js ./tests/fixtures/js/other.js';
+		case 'js_glob_files':
+			return './tests/fixtures/js/*';
 		case 'php':
 			return './tests/fixtures/php/db.php';
 		default:
