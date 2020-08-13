@@ -5,6 +5,8 @@ describe.each([
 	['queryDb', 'js', 'js', 1],
 	['makeQuery', 'js', 'js', 3],
 	['parseQuery', 'js', 'js', 5],
+	['parseQuery', 'js', 'js_2_files', 5],
+	['parseQuery', 'js', 'js_glob_files', 5],
 	['objectWithFunctionShorthand', 'js', 'js', 9],
 	['shorthandFunction', 'js', 'js', 10],
 	['shorthandFunction', undefined, 'js', 10], // auto-detect type
