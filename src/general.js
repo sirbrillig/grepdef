@@ -30,7 +30,7 @@ const humanOutput = require('./reporters/human.js');
 
 /**
  * @typedef {object} SearchConfig
- * @property {FileType} type
+ * @property {FileType|null} type
  * @property {boolean} [verbose]
  * @property {SearchTool} searchTool
  * @property {Glob} path
@@ -61,6 +61,9 @@ async function searchAndReport(symbol, { type, verbose, searchTool, path }, repo
  * @returns {Promise<SearchResult[]>}
  */
 async function search(symbol, { type, verbose, searchTool, path }) {
+	if (!type) {
+		type = guessTypeFromPath(path);
+	}
 	const regexp = getRegexpForType(symbol, type);
 	const searcher = getSearchToolForSearcherName(searchTool);
 	return searcher(regexp, { type, verbose, searchTool, path });
@@ -126,6 +129,21 @@ function getReporterForReporterName(type) {
 		default:
 			throw new Error('Unknown reporter type');
 	}
+}
+
+/**
+ * @param {Glob} path
+ * @returns {FileType|null}
+*/
+function guessTypeFromPath(path) {
+	const jsFileRegexp = /\.(js|ts|jsx|tsx)$/;
+	if (jsFileRegexp.test(path)) {
+		return 'js';
+	}
+	if (path.endsWith('.php')) {
+		return 'php';
+	}
+	return null;
 }
 
 module.exports = {
