@@ -16,6 +16,10 @@ of JavaScript so a type of 'typescript' is equivalent to 'js'.
 The symbol is the full string name of a class, function, variable, or similar
 construct.
 
+The path is a relative or absolute file path to a file or a directory or a
+space-separated series of such paths. You can also use UNIX globs which the
+shell will turn into paths.
+
 If a search path is not provided, this will search starting from the current
 directory.
 
@@ -33,7 +37,7 @@ async function grepdef(args) {
 	const searchTool = options.searcher || 'ripgrep';
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
-	const path = options._[1] || '.';
+	const path = options._.join(' ') || '.';
 	if (options.h || options.help) {
 		printHelp();
 		process.exit(0);
