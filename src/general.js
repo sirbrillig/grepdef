@@ -134,13 +134,14 @@ function getReporterForReporterName(type) {
 /**
  * @param {Glob} path
  * @returns {FileType|null}
-*/
+ */
 function guessTypeFromPath(path) {
+	const pathNodes = path.split(' ');
 	const jsFileRegexp = /\.(js|ts|jsx|tsx)$/;
-	if (jsFileRegexp.test(path)) {
+	if (pathNodes.some(node => jsFileRegexp.test(node))) {
 		return 'js';
 	}
-	if (path.endsWith('.php')) {
+	if (pathNodes.some(node => node.endsWith('.php'))) {
 		return 'php';
 	}
 	return null;
