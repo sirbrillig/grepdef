@@ -1,18 +1,19 @@
 // @ts-check
 
-const chalk = require('chalk');
+const chalk = require('chalk').default;
 
 /**
  * @param {import('../searchers/ripgrep').SearchResult[]} results
  * @param {import('../general').SearchConfig} config
  * @return {string[]}
  */
-function outputResults(results, {showLineNumbers}) {
+function outputResults(results, { showLineNumbers, disableColor }) {
+	const ctx = disableColor ? new chalk.constructor({ level: 0 }) : chalk;
 	return results.map(match => {
 		if (showLineNumbers) {
-			return `${chalk.default.magenta(match.path)}:${chalk.default.green(String(match.line))}:${match.text}`;
+			return `${ctx.magenta(match.path)}:${ctx.green(String(match.line))}:${match.text}`;
 		}
-		return `${chalk.default.magenta(match.path)}:${match.text}`;
+		return `${ctx.magenta(match.path)}:${match.text}`;
 	});
 }
 

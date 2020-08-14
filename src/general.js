@@ -38,6 +38,7 @@ const readdir = util.promisify(fs.readdir);
  * @property {FileType|null} type
  * @property {boolean} verbose
  * @property {boolean} showLineNumbers
+ * @property {boolean} disableColor
  * @property {SearchTool} searchTool
  * @property {Glob} path
  */

@@ -43,6 +43,9 @@ OPTIONS:
 	--reporter <REPORTER>
 		Use the specified reporter. Currently only 'human' is supported.
 
+	--no-color
+		Disable colors in reporters that support them.
+
 	-h, --help
 		Print this help text.
 	`;
@@ -52,12 +55,13 @@ OPTIONS:
 async function grepdef(args) {
 	const options = minimist(args, {
 		string: ['type', 'searcher', 'reporter'],
-		boolean: ['n', 'line-number', 'help', 'h'],
+		boolean: ['n', 'line-number', 'help', 'h', 'no-color'],
 	});
 	const langType = options.type;
 	const searchTool = options.searcher || 'ripgrep';
 	const reporterName = options.reporter || 'human';
 	const showLineNumbers = options.n || options['line-number'];
+	const disableColor = options['no-color'];
 	const searchSymbol = options._[0];
 	const path = options._.slice(1).join(' ') || '.';
 	if (options.h || options.help) {
@@ -77,6 +81,7 @@ async function grepdef(args) {
 			searchTool,
 			path,
 			showLineNumbers,
+			disableColor,
 		},
 		reporterName
 	).catch(error => {
