@@ -26,7 +26,7 @@ const readdir = util.promisify(fs.readdir);
  */
 
 /**
- * @typedef {(arg: SearchResult[]) => void} ReporterFunction
+ * @typedef {(arg: SearchResult[], config: SearchConfig) => void} ReporterFunction
  */
 
 /**
@@ -36,7 +36,8 @@ const readdir = util.promisify(fs.readdir);
 /**
  * @typedef {object} SearchConfig
  * @property {FileType|null} type
- * @property {boolean} [verbose]
+ * @property {boolean} verbose
+ * @property {boolean} showLineNumbers
  * @property {SearchTool} searchTool
  * @property {Glob} path
  */
@@ -54,10 +55,10 @@ const readdir = util.promisify(fs.readdir);
  * @param {ReporterType} reporterName
  * @returns void
  */
-async function searchAndReport(symbol, { type, verbose, searchTool, path }, reporterName) {
-	const results = await search(symbol, { type, verbose, searchTool, path });
+async function searchAndReport(symbol, config, reporterName) {
+	const results = await search(symbol, config);
 	const reporter = getReporterForReporterName(reporterName);
-	reporter(results);
+	reporter(results, config);
 }
 
 /**
@@ -65,13 +66,13 @@ async function searchAndReport(symbol, { type, verbose, searchTool, path }, repo
  * @param {SearchConfig} config
  * @returns {Promise<SearchResult[]>}
  */
-async function search(symbol, { type, verbose, searchTool, path }) {
+async function search(symbol, { type, searchTool, path, ...otherOptions }) {
 	if (!type) {
 		type = await guessType(path);
 	}
 	const regexp = getRegexpForType(symbol, type);
 	const searcher = getSearchToolForSearcherName(searchTool);
-	return searcher(regexp, { type, verbose, searchTool, path });
+	return searcher(regexp, { type, searchTool, path, ...otherOptions });
 }
 
 /**
