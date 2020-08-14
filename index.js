@@ -7,11 +7,14 @@ function printHelp() {
 	const helpText = `
 grepdef: search for symbol definitions in various programming languages
 
-Usage: grepdef --type <type> <symbol> [path]
+Usage: grepdef [--type <type>] <symbol> [path]
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
 those strings (eg: 'javascript.jsx'). Typescript is currently considered part
 of JavaScript so a type of 'typescript' is equivalent to 'js'.
+
+If the type is not provided, grepdef will try to guess the filetype, but this
+may be inaccurate.
 
 The symbol is the full string name of a class, function, variable, or similar
 construct.
