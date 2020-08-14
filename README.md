@@ -48,7 +48,7 @@ Print the version information.
 
 ```
 $ grepdef --type js parseQuery
-./test/fixtures/js/db.js:5:function parseQuery() {
+./test/fixtures/js/db.js:function parseQuery() {
 ```
 
 ## Installing
