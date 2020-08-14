@@ -7,7 +7,7 @@ function printHelp() {
 	const helpText = `
 grepdef: search for symbol definitions in various programming languages
 
-Usage: grepdef [--type <type>] [OPTIONS] <symbol> [path]
+Usage: grepdef [options] <symbol> [path]
 
 The symbol is the full string name of a class, function, variable, or similar
 construct.
@@ -19,36 +19,45 @@ shell will turn into paths.
 If a search path is not provided, this will search starting from the current
 directory.
 
+You should use the '--type' option whenever possible, but grepdef will try to
+guess the type if it is not set.
+
 The output is like using grep, but will only show places where that symbol is
 defined (no partial matches, variable uses, or function calls). The search uses
 a regular expression so it is unaware of scope and is far from fullproof, but
-should be easier than a grep by itself.
+should be easier and faster than a grep by itself.
 
-OPTIONS:
+Options:
 
-	-t, --type <TYPE>
-		The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
-		those strings (eg: 'javascript.jsx'). Typescript is currently considered part
-		of JavaScript so a type of 'typescript' is equivalent to 'js'.
+-t, --type <TYPE>
 
-		If the type is not provided, grepdef will try to guess the filetype, but this
-		may be inaccurate.
+  The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
+  those strings (eg: 'javascript.jsx'). Typescript is currently considered part
+  of JavaScript so a type of 'typescript' is equivalent to 'js'.
 
-	-n, --line-number
-		Show line numbers (1-based).
+  If the type is not provided, grepdef will try to guess the filetype, but this
+  may be inaccurate.
 
-	--searcher <SEARCHER>
-		Use the specified searcher. Currently only 'ripgrep' is supported.
+-n, --line-number
 
-	--reporter <REPORTER>
-		Use the specified reporter. Currently only 'human' is supported.
+  Show line numbers (1-based).
 
-	--no-color
-		Disable colors in reporters that support them.
+--searcher <SEARCHER>
 
-	-h, --help
-		Print this help text.
-	`;
+  Use the specified searcher. Currently only 'ripgrep' is supported.
+
+--reporter <REPORTER>
+
+  Use the specified reporter. Currently only 'human' is supported.
+
+--no-color
+
+  Disable colors in reporters that support them.
+
+-h, --help
+
+  Print this help text.
+`;
 	console.log(helpText);
 }
 
