@@ -12,6 +12,7 @@ describe.each([
 	['shorthandFunction', undefined, 'js', 10], // auto-detect type
 	['shorthandFunction', undefined, 'js_2_files', 10], // auto_detect type
 	['shorthandFunction', undefined, 'js_directory', 10], // auto_detect type
+	['shorthandFunction', undefined, 'js_parent_directory', 10], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
@@ -48,6 +49,8 @@ function getFixtureForType(type) {
 			return './tests/fixtures/js/db.js ./tests/fixtures/js/other.js';
 		case 'js_directory':
 			return './tests/fixtures/js';
+		case 'js_parent_directory':
+			return './tests/fixtures/js-parent';
 		case 'php':
 			return './tests/fixtures/php/db.php';
 		default:
@@ -65,9 +68,11 @@ function getExpectedResultPath(type) {
 		case 'js_2_files':
 		case 'js_directory':
 			return './tests/fixtures/js/db.js';
+		case 'js_parent_directory':
+			return './tests/fixtures/js-parent/src/db.js';
 		case 'php':
 			return './tests/fixtures/php/db.php';
 		default:
-			throw new Error(`Could not find fixture for type '${type}'`);
+			throw new Error(`Could not find expected result file for type '${type}'`);
 	}
 }
