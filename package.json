@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "chalk": "^2.4.2",
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "vscode-ripgrep": "^1.8.0"
   },
   "bin": {
     "grepdef": "bin/grepdef"
