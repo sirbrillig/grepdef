@@ -1,3 +1,4 @@
+// @ts-check
 const { normalizeType } = require('../src/general');
 
 describe.each([
