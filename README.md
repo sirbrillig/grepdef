@@ -2,7 +2,7 @@
 
 A cli tool to search for symbol definitions in various programming languages
 
-Usage: grepdef [--type <type>] <symbol> [path]
+Usage: grepdef [--type &lt;type&gt;] &lt;symbol&gt; [path]
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for those strings (eg: 'javascript.jsx'). Typescript is currently considered part of JavaScript so a type of 'typescript' is equivalent to 'js'.
 
