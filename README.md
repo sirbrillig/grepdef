@@ -40,6 +40,10 @@ Disable colors in reporters that support them.
 
 Print this help text.
 
+-v, --version
+
+Print the version information.
+
 ## Example
 
 ```

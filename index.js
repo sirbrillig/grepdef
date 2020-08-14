@@ -2,6 +2,11 @@
 
 const minimist = require('minimist');
 const { searchAndReport, normalizeType } = require('./src/general.js');
+var packageJson = require('./package.json');
+
+function printVersion() {
+	console.log(`grepdef ${packageJson.version}`);
+}
 
 function printHelp() {
 	const helpText = `
@@ -57,6 +62,10 @@ Options:
 -h, --help
 
   Print this help text.
+
+-v, --version
+
+  Print the version information.
 `;
 	console.log(helpText);
 }
@@ -64,7 +73,7 @@ Options:
 async function grepdef(args) {
 	const options = minimist(args, {
 		string: ['type', 'searcher', 'reporter'],
-		boolean: ['n', 'line-number', 'help', 'h', 'no-color'],
+		boolean: ['n', 'line-number', 'help', 'h', 'no-color', 'v', 'version'],
 	});
 	const langType = options.type;
 	const searchTool = options.searcher || 'ripgrep';
@@ -75,6 +84,10 @@ async function grepdef(args) {
 	const path = options._.slice(1).join(' ') || '.';
 	if (options.h || options.help) {
 		printHelp();
+		process.exit(0);
+	}
+	if (options.v || options.version) {
+		printVersion();
 		process.exit(0);
 	}
 	if (!searchSymbol) {
