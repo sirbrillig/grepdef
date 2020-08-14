@@ -1,6 +1,6 @@
 # grepdef
 
-Usage: grepdef [options] <symbol> [path]
+Usage: grepdef [options] &lt;symbol&gt; [path]
 
 The symbol is the full string name of a class, function, variable, or similar construct.
 
@@ -14,7 +14,7 @@ The output is like using grep, but will only show places where that symbol is de
 
 ## CLI Options
 
--t, --type <TYPE>
+-t, --type &lt;TYPE&gt;
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for those strings (eg: 'javascript.jsx'). Typescript is currently considered part of JavaScript so a type of 'typescript' is equivalent to 'js'.
 
@@ -24,11 +24,11 @@ If the type is not provided, grepdef will try to guess the filetype, but this ma
 
 Show line numbers (1-based).
 
---searcher <SEARCHER>
+--searcher &lt;SEARCHER&gt;
 
 Use the specified searcher. Currently only 'ripgrep' is supported.
 
---reporter <REPORTER>
+--reporter &lt;REPORTER&gt;
 
 Use the specified reporter. Currently only 'human' is supported.
 
