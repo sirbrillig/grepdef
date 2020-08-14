@@ -3,6 +3,11 @@ const getJsRegexp = require('./lang/js.js');
 const getPhpRegexp = require('./lang/php.js');
 const ripgrepSearch = require('./searchers/ripgrep.js');
 const humanOutput = require('./reporters/human.js');
+const fs = require('fs');
+const util = require('util');
+
+const lstat = util.promisify(fs.lstat);
+const readdir = util.promisify(fs.readdir);
 
 /**
  * @typedef {'js'|'php'} FileType
@@ -30,7 +35,7 @@ const humanOutput = require('./reporters/human.js');
 
 /**
  * @typedef {object} SearchConfig
- * @property {FileType} type
+ * @property {FileType|null} type
  * @property {boolean} [verbose]
  * @property {SearchTool} searchTool
  * @property {Glob} path
@@ -61,6 +66,9 @@ async function searchAndReport(symbol, { type, verbose, searchTool, path }, repo
  * @returns {Promise<SearchResult[]>}
  */
 async function search(symbol, { type, verbose, searchTool, path }) {
+	if (!type) {
+		type = await guessType(path);
+	}
 	const regexp = getRegexpForType(symbol, type);
 	const searcher = getSearchToolForSearcherName(searchTool);
 	return searcher(regexp, { type, verbose, searchTool, path });
@@ -126,6 +134,54 @@ function getReporterForReporterName(type) {
 		default:
 			throw new Error('Unknown reporter type');
 	}
+}
+
+/**
+ * @param {Glob} path
+ * @returns {Promise<FileType|null>}
+ */
+async function guessType(path) {
+	const pathNodes = path.split(' ');
+	const guess = guessTypeFromFiles(pathNodes);
+	return guess || guessTypeFromNearby(path);
+}
+
+/**
+ * @param {string[]} files
+ * @returns {FileType|null}
+ */
+function guessTypeFromFiles(files) {
+	const jsFileRegexp = /\.(js|ts|jsx|tsx)$/;
+	if (files.some(node => jsFileRegexp.test(node))) {
+		return 'js';
+	}
+	if (files.some(node => node.endsWith('.php'))) {
+		return 'php';
+	}
+	if (files.some(node => node === 'package.json')) {
+		return 'js';
+	}
+	return null;
+}
+
+/**
+ * @param {Glob} path
+ * @returns {Promise<FileType|null>}
+ */
+async function guessTypeFromNearby(path) {
+	const pathNodes = path.split(' ');
+	// look for any js/php files in the current directory
+	for (const node of pathNodes) {
+		const nodeStat = await lstat(node);
+		if (nodeStat.isDirectory()) {
+			const nodesInDirectory = await readdir(node);
+			const guess = guessTypeFromFiles(nodesInDirectory);
+			if (guess) {
+				return guess;
+			}
+		}
+	}
+	return null;
 }
 
 module.exports = {

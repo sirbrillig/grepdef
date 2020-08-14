@@ -7,14 +7,21 @@ function printHelp() {
 	const helpText = `
 grepdef: search for symbol definitions in various programming languages
 
-Usage: grepdef --type <type> <symbol> [path]
+Usage: grepdef [--type <type>] <symbol> [path]
 
 The type is a vim-compatible filetype. One of 'js', 'php', or an alias for
 those strings (eg: 'javascript.jsx'). Typescript is currently considered part
 of JavaScript so a type of 'typescript' is equivalent to 'js'.
 
+If the type is not provided, grepdef will try to guess the filetype, but this
+may be inaccurate.
+
 The symbol is the full string name of a class, function, variable, or similar
 construct.
+
+The path is a relative or absolute file path to a file or a directory or a
+space-separated series of such paths. You can also use UNIX globs which the
+shell will turn into paths.
 
 If a search path is not provided, this will search starting from the current
 directory.
@@ -33,7 +40,7 @@ async function grepdef(args) {
 	const searchTool = options.searcher || 'ripgrep';
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
-	const path = options._[1] || '.';
+	const path = options._.slice(1).join(' ') || '.';
 	if (options.h || options.help) {
 		printHelp();
 		process.exit(0);
