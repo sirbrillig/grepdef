@@ -3,6 +3,7 @@
 
 const util = require('util');
 const childProcess = require('child_process');
+const { rgPath } = require('vscode-ripgrep');
 
 const exec = util.promisify(childProcess.exec);
 
@@ -18,7 +19,7 @@ const exec = util.promisify(childProcess.exec);
 async function searchWithRegexp(regexp, { type, path, verbose }) {
 	const fileTypes = ['js', 'ts'].includes(type) ? ['js', 'ts'] : [type];
 	const typeOptions = fileTypes.map(fileType => `--type ${fileType}`).join(' ');
-	const command = `rg ${typeOptions} --json '${regexp}' ${path}`;
+	const command = `${rgPath} ${typeOptions} --json '${regexp}' ${path}`;
 	try {
 		verbose && console.log('command:', command);
 		const { stdout } = await exec(command);
