@@ -37,7 +37,7 @@ async function grepdef(args) {
 	const searchTool = options.searcher || 'ripgrep';
 	const reporterName = options.reporter || 'human';
 	const searchSymbol = options._[0];
-	const path = options._.join(' ') || '.';
+	const path = options._.slice(1).join(' ') || '.';
 	if (options.h || options.help) {
 		printHelp();
 		process.exit(0);
