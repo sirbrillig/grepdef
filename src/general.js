@@ -26,7 +26,7 @@ const readdir = util.promisify(fs.readdir);
  */
 
 /**
- * @typedef {(arg: SearchResult[], config: SearchConfig) => void} ReporterFunction
+ * @typedef {(arg: SearchResult[], config: SearchConfig) => string[]} ReporterFunction
  */
 
 /**
@@ -58,7 +58,8 @@ const readdir = util.promisify(fs.readdir);
 async function searchAndReport(symbol, config, reporterName) {
 	const results = await search(symbol, config);
 	const reporter = getReporterForReporterName(reporterName);
-	reporter(results, config);
+	const output = reporter(results, config);
+	output.forEach(result => console.log(result));
 }
 
 /**
@@ -189,4 +190,5 @@ module.exports = {
 	search,
 	searchAndReport,
 	normalizeType,
+	getReporterForReporterName,
 };
