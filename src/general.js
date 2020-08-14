@@ -3,6 +3,11 @@ const getJsRegexp = require('./lang/js.js');
 const getPhpRegexp = require('./lang/php.js');
 const ripgrepSearch = require('./searchers/ripgrep.js');
 const humanOutput = require('./reporters/human.js');
+const fs = require('fs');
+const util = require('util');
+
+const lstat = util.promisify(fs.lstat);
+const readdir = util.promisify(fs.readdir);
 
 /**
  * @typedef {'js'|'php'} FileType
@@ -62,7 +67,7 @@ async function searchAndReport(symbol, { type, verbose, searchTool, path }, repo
  */
 async function search(symbol, { type, verbose, searchTool, path }) {
 	if (!type) {
-		type = guessTypeFromPath(path);
+		type = await guessType(path);
 	}
 	const regexp = getRegexpForType(symbol, type);
 	const searcher = getSearchToolForSearcherName(searchTool);
@@ -133,16 +138,48 @@ function getReporterForReporterName(type) {
 
 /**
  * @param {Glob} path
+ * @returns {Promise<FileType|null>}
+ */
+async function guessType(path) {
+	const pathNodes = path.split(' ');
+	const guess = guessTypeFromFiles(pathNodes);
+	return guess || guessTypeFromNearby(path);
+}
+
+/**
+ * @param {string[]} files
  * @returns {FileType|null}
  */
-function guessTypeFromPath(path) {
-	const pathNodes = path.split(' ');
+function guessTypeFromFiles(files) {
 	const jsFileRegexp = /\.(js|ts|jsx|tsx)$/;
-	if (pathNodes.some(node => jsFileRegexp.test(node))) {
+	if (files.some(node => jsFileRegexp.test(node))) {
 		return 'js';
 	}
-	if (pathNodes.some(node => node.endsWith('.php'))) {
+	if (files.some(node => node.endsWith('.php'))) {
 		return 'php';
+	}
+	if (files.some(node => node === 'package.json')) {
+		return 'js';
+	}
+	return null;
+}
+
+/**
+ * @param {Glob} path
+ * @returns {Promise<FileType|null>}
+ */
+async function guessTypeFromNearby(path) {
+	const pathNodes = path.split(' ');
+	// look for any js/php files in the current directory
+	for (const node of pathNodes) {
+		const nodeStat = await lstat(node);
+		if (nodeStat.isDirectory()) {
+			const nodesInDirectory = await readdir(node);
+			const guess = guessTypeFromFiles(nodesInDirectory);
+			if (guess) {
+				return guess;
+			}
+		}
 	}
 	return null;
 }
