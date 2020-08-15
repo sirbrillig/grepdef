@@ -9,8 +9,15 @@ describe.each([
 	['javascript.jsx', 'js'],
 	['javascriptreact', 'js'],
 	['php', 'php'],
+	['adjadhaowdjw', null],
 ])("normalizeType('%s')", (input, expected) => {
-	test(`returns '${expected}'`, () => {
-		expect(normalizeType(input)).toEqual(expected);
-	});
+	if (expected) {
+		test(`returns '${expected}'`, () => {
+			expect(normalizeType(input)).toEqual(expected);
+		});
+	} else {
+		test('throws an Error', () => {
+			expect(() => normalizeType(input)).toThrowError();
+		});
+	}
 });
