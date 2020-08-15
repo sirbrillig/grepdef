@@ -95,22 +95,24 @@ async function grepdef(args) {
 		printHelp();
 		process.exit(1);
 	}
-	searchAndReport(
-		searchSymbol,
-		{
-			type: normalizeType(langType),
-			verbose: !!options.verbose,
-			searchTool,
-			path,
-			showLineNumbers,
-			disableColor,
-		},
-		reporterName
-	).catch(error => {
+	try {
+		await searchAndReport(
+			searchSymbol,
+			{
+				type: normalizeType(langType),
+				verbose: !!options.verbose,
+				searchTool,
+				path,
+				showLineNumbers,
+				disableColor,
+			},
+			reporterName
+		);
+	} catch (error) {
 		console.error(error.message);
-		printHelp();
+		console.error('Try running "grepdef --help" for information about how to use this tool.');
 		process.exit(1);
-	});
+	}
 }
 
 module.exports = grepdef;

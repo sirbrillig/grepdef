@@ -102,13 +102,13 @@ function getRegexpForType(symbol, type) {
 		case 'php':
 			return getPhpRegexp(symbol);
 		default:
-			throw new Error('Unknown language type');
+			throw new Error(`Unknown language type '${type}'`);
 	}
 }
 
 /**
  * @param {string} type
- * @returns {FileType|null}
+ * @returns {FileType}
  */
 function normalizeType(type) {
 	switch (type) {
@@ -122,7 +122,7 @@ function normalizeType(type) {
 		case 'php':
 			return 'php';
 		default:
-			return null;
+			throw new Error(`Unknown language type '${type}'`);
 	}
 }
 
