@@ -99,7 +99,7 @@ async function grepdef(args) {
 		await searchAndReport(
 			searchSymbol,
 			{
-				type: normalizeType(langType),
+				type: langType ? normalizeType(langType) : null,
 				verbose: !!options.verbose,
 				searchTool,
 				path,
