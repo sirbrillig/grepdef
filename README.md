@@ -59,9 +59,11 @@ This tool is a node script, so you must have [node](https://nodejs.org/en/) inst
 npm install -g @sirbrillig/grepdef
 ```
 
-## Using with vim
+## Using with editors
 
-See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
+- vim: See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
+- VS Code: See [vscode-grepdef](https://github.com/sirbrillig/vscode-grepdef)
+
 
 ## Acknowledgments
 
