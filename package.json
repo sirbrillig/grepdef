@@ -34,8 +34,5 @@
   "bugs": {
     "url": "https://github.com/sirbrillig/grepdef/issues"
   },
-  "homepage": "https://github.com/sirbrillig/grepdef#readme",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  }
+  "homepage": "https://github.com/sirbrillig/grepdef#readme"
 }
