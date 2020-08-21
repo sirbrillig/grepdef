@@ -66,6 +66,10 @@ Options:
 -v, --version
 
   Print the version information.
+
+--verbose
+
+  Print additional information when running, like the raw grep command.
 `;
 	console.log(helpText);
 }
@@ -73,7 +77,7 @@ Options:
 async function grepdef(args) {
 	const options = minimist(args, {
 		string: ['type', 'searcher', 'reporter'],
-		boolean: ['n', 'line-number', 'help', 'h', 'no-color', 'v', 'version'],
+		boolean: ['n', 'line-number', 'help', 'h', 'no-color', 'v', 'version', 'verbose'],
 	});
 	const langType = options.type;
 	const searchTool = options.searcher || 'ripgrep';
@@ -81,6 +85,7 @@ async function grepdef(args) {
 	const showLineNumbers = options.n || options['line-number'];
 	const disableColor = options['no-color'];
 	const searchSymbol = options._[0];
+	const verbose = options.verbose;
 	const path = options._.slice(1).join(' ') || '.';
 	if (options.h || options.help) {
 		printHelp();
@@ -100,7 +105,7 @@ async function grepdef(args) {
 			searchSymbol,
 			{
 				type: langType ? normalizeType(langType) : null,
-				verbose: !!options.verbose,
+				verbose,
 				searchTool,
 				path,
 				showLineNumbers,

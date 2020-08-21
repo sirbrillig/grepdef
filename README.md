@@ -44,6 +44,10 @@ Print this help text.
 
 Print the version information.
 
+--verbose
+
+Print the raw grep command being run.
+
 ## Example
 
 ```
