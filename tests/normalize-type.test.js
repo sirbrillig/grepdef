@@ -6,6 +6,7 @@ describe.each([
 	['javascript', 'js'],
 	['typescript', 'js'],
 	['typescript.tsx', 'js'],
+	['typescriptreact', 'js'],
 	['javascript.jsx', 'js'],
 	['javascriptreact', 'js'],
 	['php', 'php'],
