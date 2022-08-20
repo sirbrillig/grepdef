@@ -15,6 +15,8 @@ describe.each([
 	['shorthandFunction', undefined, 'js_parent_directory', 10], // auto_detect type
 	['longhandFunction', undefined, 'js_parent_directory', 16], // auto_detect type
 	['longhandArrowFunction', undefined, 'js_parent_directory', 22], // auto_detect type
+	['longhandProperty', undefined, 'js_parent_directory', 28], // auto_detect type
+	['shorthandProperty', undefined, 'js_parent_directory', 32], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],

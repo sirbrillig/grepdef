@@ -23,3 +23,11 @@ const objectWithArrowFunctionLonghand = {
 		return 'hi';
 	}
 };
+
+const objectWithPropertyLonghand = {
+	longhandProperty: 'hello',
+};
+
+const objectWithPropertyShorthand = {
+	shorthandProperty,
+};
