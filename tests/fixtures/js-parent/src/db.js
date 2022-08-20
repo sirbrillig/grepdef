@@ -11,3 +11,15 @@ const objectWithFunctionShorthand = {
 		return 'hi';
 	}
 };
+
+const objectWithFunctionLonghand = {
+	longhandFunction: function() {
+		return 'hi';
+	}
+};
+
+const objectWithArrowFunctionLonghand = {
+	longhandArrowFunction: () => {
+		return 'hi';
+	}
+};
