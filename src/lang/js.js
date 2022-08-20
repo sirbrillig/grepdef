@@ -15,7 +15,7 @@ function getRegexp(symbol) {
 	const prototypeDeclaration = `\\bprototype\\.${symbol}\\b`
 	const methodShorthand = `\\b${symbol}\\([^)]*\\)\\s*(:[^{]+)?\\{`;
 	const propertyLonghand = `\\b${symbol}:\\s*`;
-	const typedef = `@typedef\\s\\{[^}]+\\}\\s${symbol}\\b`;
+	const typedef = `@typedef\\s(\\{[^}]+\\}\\s)?${symbol}\\b`;
 	const regexpParts = [
 		symbolWithDeclaration,
 		prototypeDeclaration,
