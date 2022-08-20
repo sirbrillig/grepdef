@@ -3,19 +3,19 @@ const { search } = require('../src/general');
 
 describe.each([
 	['queryDb', 'js', 'js', 1],
-	['makeQuery', 'js', 'js', 3],
-	['parseQuery', 'js', 'js', 5],
-	['parseQuery', 'js', 'js_2_files', 5],
-	['parseQuery', 'js', 'js_directory', 5],
-	['objectWithFunctionShorthand', 'js', 'js', 9],
-	['shorthandFunction', 'js', 'js', 10],
-	['shorthandFunction', undefined, 'js', 10], // auto-detect type
-	['shorthandFunction', undefined, 'js_2_files', 10], // auto_detect type
-	['shorthandFunction', undefined, 'js_directory', 10], // auto_detect type
-	['shorthandFunction', undefined, 'js_parent_directory', 10], // auto_detect type
-	['longhandFunction', undefined, 'js_parent_directory', 16], // auto_detect type
-	['longhandArrowFunction', undefined, 'js_parent_directory', 22], // auto_detect type
-	['longhandProperty', undefined, 'js_parent_directory', 28], // auto_detect type
+	['makeQuery', 'js', 'js', 4],
+	['parseQuery', 'js', 'js', 7],
+	['parseQuery', 'js', 'js_2_files', 7],
+	['parseQuery', 'js', 'js_directory', 7],
+	['objectWithFunctionShorthand', 'js', 'js', 15],
+	['shorthandFunction', 'js', 'js', 16],
+	['shorthandFunction', undefined, 'js', 16], // auto-detect type
+	['shorthandFunction', undefined, 'js_2_files', 16], // auto_detect type
+	['shorthandFunction', undefined, 'js_directory', 16], // auto_detect type
+	['shorthandFunction', undefined, 'js_parent_directory', 16], // auto_detect type
+	['longhandFunction', undefined, 'js_parent_directory', 25], // auto_detect type
+	['longhandArrowFunction', undefined, 'js_parent_directory', 34], // auto_detect type
+	['longhandProperty', undefined, 'js_parent_directory', 43], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
