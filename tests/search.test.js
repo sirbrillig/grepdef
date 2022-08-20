@@ -3,16 +3,32 @@ const { search } = require('../src/general');
 
 describe.each([
 	['queryDb', 'js', 'js', 1],
-	['makeQuery', 'js', 'js', 3],
-	['parseQuery', 'js', 'js', 5],
-	['parseQuery', 'js', 'js_2_files', 5],
-	['parseQuery', 'js', 'js_directory', 5],
-	['objectWithFunctionShorthand', 'js', 'js', 9],
-	['shorthandFunction', 'js', 'js', 10],
-	['shorthandFunction', undefined, 'js', 10], // auto-detect type
-	['shorthandFunction', undefined, 'js_2_files', 10], // auto_detect type
-	['shorthandFunction', undefined, 'js_directory', 10], // auto_detect type
-	['shorthandFunction', undefined, 'js_parent_directory', 10], // auto_detect type
+	['queryDbTS', 'js', 'ts', 1],
+	['makeQuery', 'js', 'js', 4],
+	['makeQueryTS', 'js', 'ts', 4],
+	['parseQuery', 'js', 'js', 7],
+	['parseQuery', 'js', 'js_2_files', 7],
+	['parseQuery', 'js', 'js_directory', 7],
+	['parseQueryTS', 'js', 'ts', 7],
+	['objectWithFunctionShorthand', 'js', 'js', 15],
+	['objectWithFunctionShorthandTS', 'js', 'ts', 15],
+	['shorthandFunction', 'js', 'js', 16],
+	['shorthandFunctionTS', 'js', 'ts', 16],
+	['shorthandFunction', undefined, 'js', 16], // auto-detect type
+	['shorthandFunctionTS', undefined, 'ts', 16], // auto-detect type
+	['shorthandFunction', undefined, 'js_2_files', 16], // auto_detect type
+	['shorthandFunction', undefined, 'js_directory', 16], // auto_detect type
+	['shorthandFunction', undefined, 'js_parent_directory', 16], // auto_detect type
+	['longhandFunction', undefined, 'js_parent_directory', 25], // auto_detect type
+	['longhandFunctionTS', undefined, 'ts', 25], // auto_detect type
+	['longhandArrowFunction', undefined, 'js_parent_directory', 34], // auto_detect type
+	['longhandArrowFunctionTS', undefined, 'ts', 34], // auto_detect type
+	['longhandProperty', undefined, 'js_parent_directory', 43], // auto_detect type
+	['longhandPropertyTS', undefined, 'ts', 43], // auto_detect type
+	['AnInterface', undefined, 'ts', 59], // auto_detect type
+	['AType', undefined, 'ts', 63], // auto_detect type
+	['TypeDefObject', undefined, 'ts', 66], // auto_detect type
+	['TypeDefSimple', undefined, 'ts', 72], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
@@ -20,14 +36,25 @@ describe.each([
 	['Bar', 'php', 'php', 14],
 	['Zoom', 'php', 'php', 17],
 	['Zoom', undefined, 'php', 17], // auto-detect type
-])("search('%s', {type: '%s', path: '%s'})", (symbol, type, fixtureType, expectedLine) => {
+])("search('%s', {type: '%s', path: '%s'})",
+
+	/**
+	 * @param {string} symbol
+	 * @param {import('../src/general').FileType} type
+	 * @param {string} fixtureType
+	 * @param {number} expectedLine
+	 */
+	(symbol, type, fixtureType, expectedLine) => {
 	test(`finds line '${expectedLine}'`, async () => {
 		const path = getFixtureForType(fixtureType);
+
+		/** @type {import('../src/general').SearchConfig} */
 		const config = {
 			type,
 			searchTool: 'ripgrep',
 			path,
 		};
+
 		const results = await search(symbol, config);
 		expect(results.length).toEqual(1);
 		const result = results[0];
@@ -43,6 +70,8 @@ describe.each([
  */
 function getFixtureForType(type) {
 	switch (type) {
+		case 'ts':
+			return './tests/fixtures/js/misc.ts';
 		case 'js':
 			return './tests/fixtures/js/db.js';
 		case 'js_2_files':
@@ -64,6 +93,8 @@ function getFixtureForType(type) {
  */
 function getExpectedResultPath(type) {
 	switch (type) {
+		case 'ts':
+			return './tests/fixtures/js/misc.ts';
 		case 'js':
 		case 'js_2_files':
 		case 'js_directory':
