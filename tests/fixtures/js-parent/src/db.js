@@ -31,3 +31,10 @@ const objectWithPropertyLonghand = {
 const objectWithPropertyShorthand = {
 	shorthandProperty,
 };
+
+const arrayDef = [
+	longhandFunction,
+	longhandArrowFunction,
+	longhandProperty,
+	shorthandProperty,
+];
