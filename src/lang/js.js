@@ -16,12 +16,14 @@ function getRegexp(symbol) {
 	const methodShorthand = `${symbol}\\([^)]*\\)\\s*\\{`;
 	const methodLonghand = `${symbol}:\\s*function\\([^)]*\\)\\s*\\{`;
 	const methodArrowFunction = `${symbol}:\\s*\\([^)]*\\)\\s*=>\\s*\\{`;
+	const propertyLonghand = `${symbol}:\\s*`;
 	const regexpParts = [
 		symbolWithDeclaration,
 		prototypeDeclaration,
 		methodShorthand,
 		methodLonghand,
 		methodArrowFunction,
+		propertyLonghand,
 	];
 	return `\\b(${[regexpParts.join('|')]})`;
 }
