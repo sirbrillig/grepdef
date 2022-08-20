@@ -27,6 +27,7 @@ describe.each([
 	['longhandPropertyTS', undefined, 'ts', 43], // auto_detect type
 	['AnInterface', undefined, 'ts', 59], // auto_detect type
 	['AType', undefined, 'ts', 63], // auto_detect type
+	['TypeDefObject', undefined, 'ts', 66], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
