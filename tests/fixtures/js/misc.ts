@@ -67,3 +67,9 @@ type AType = 'something' | 'somethingelse';
  * @property {number} loaded Number of bytes already transferred
  * @property {number} total  Total number of bytes to transfer
  */
+
+/**
+ * @typedef TypeDefSimple
+ * @property {number} loaded Number of bytes already transferred
+ * @property {number} total  Total number of bytes to transfer
+ */
