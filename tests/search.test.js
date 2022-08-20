@@ -20,14 +20,25 @@ describe.each([
 	['Bar', 'php', 'php', 14],
 	['Zoom', 'php', 'php', 17],
 	['Zoom', undefined, 'php', 17], // auto-detect type
-])("search('%s', {type: '%s', path: '%s'})", (symbol, type, fixtureType, expectedLine) => {
+])("search('%s', {type: '%s', path: '%s'})",
+
+	/**
+	 * @param {string} symbol
+	 * @param {import('../src/general').FileType} type
+	 * @param {string} fixtureType
+	 * @param {number} expectedLine
+	 */
+	(symbol, type, fixtureType, expectedLine) => {
 	test(`finds line '${expectedLine}'`, async () => {
 		const path = getFixtureForType(fixtureType);
+
+		/** @type {import('../src/general').SearchConfig} */
 		const config = {
 			type,
 			searchTool: 'ripgrep',
 			path,
 		};
+
 		const results = await search(symbol, config);
 		expect(results.length).toEqual(1);
 		const result = results[0];

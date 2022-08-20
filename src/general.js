@@ -35,10 +35,10 @@ const readdir = util.promisify(fs.readdir);
 
 /**
  * @typedef {object} SearchConfig
- * @property {FileType|null} type
- * @property {boolean} verbose
- * @property {boolean} showLineNumbers
- * @property {boolean} disableColor
+ * @property {FileType|null} [type]
+ * @property {boolean} [verbose]
+ * @property {boolean} [showLineNumbers]
+ * @property {boolean} [disableColor]
  * @property {SearchTool} searchTool
  * @property {Glob} path
  */
