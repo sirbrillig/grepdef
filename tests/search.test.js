@@ -3,19 +3,30 @@ const { search } = require('../src/general');
 
 describe.each([
 	['queryDb', 'js', 'js', 1],
+	['queryDbTS', 'js', 'ts', 1],
 	['makeQuery', 'js', 'js', 4],
+	['makeQueryTS', 'js', 'ts', 4],
 	['parseQuery', 'js', 'js', 7],
 	['parseQuery', 'js', 'js_2_files', 7],
 	['parseQuery', 'js', 'js_directory', 7],
+	['parseQueryTS', 'js', 'ts', 7],
 	['objectWithFunctionShorthand', 'js', 'js', 15],
+	['objectWithFunctionShorthandTS', 'js', 'ts', 15],
 	['shorthandFunction', 'js', 'js', 16],
+	['shorthandFunctionTS', 'js', 'ts', 16],
 	['shorthandFunction', undefined, 'js', 16], // auto-detect type
+	['shorthandFunctionTS', undefined, 'ts', 16], // auto-detect type
 	['shorthandFunction', undefined, 'js_2_files', 16], // auto_detect type
 	['shorthandFunction', undefined, 'js_directory', 16], // auto_detect type
 	['shorthandFunction', undefined, 'js_parent_directory', 16], // auto_detect type
 	['longhandFunction', undefined, 'js_parent_directory', 25], // auto_detect type
+	['longhandFunctionTS', undefined, 'ts', 25], // auto_detect type
 	['longhandArrowFunction', undefined, 'js_parent_directory', 34], // auto_detect type
+	['longhandArrowFunctionTS', undefined, 'ts', 34], // auto_detect type
 	['longhandProperty', undefined, 'js_parent_directory', 43], // auto_detect type
+	['longhandPropertyTS', undefined, 'ts', 43], // auto_detect type
+	['AnInterface', undefined, 'ts', 59], // auto_detect type
+	['AType', undefined, 'ts', 63], // auto_detect type
 	['queryDb', 'php', 'php', 2],
 	['$makeQuery', 'php', 'php', 4],
 	['parseQuery', 'php', 'php', 6],
@@ -57,6 +68,8 @@ describe.each([
  */
 function getFixtureForType(type) {
 	switch (type) {
+		case 'ts':
+			return './tests/fixtures/js/misc.ts';
 		case 'js':
 			return './tests/fixtures/js/db.js';
 		case 'js_2_files':
@@ -78,6 +91,8 @@ function getFixtureForType(type) {
  */
 function getExpectedResultPath(type) {
 	switch (type) {
+		case 'ts':
+			return './tests/fixtures/js/misc.ts';
 		case 'js':
 		case 'js_2_files':
 		case 'js_directory':
