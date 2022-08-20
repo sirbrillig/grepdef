@@ -1,7 +1,29 @@
 // @format
 
+const declarationKeywords = [
+	'let',
+	'var',
+	'const',
+	'function',
+	'class',
+	'interface',
+	'type',
+];
+
 function getRegexp(symbol) {
-	return `\\b((let\\s|var\\s|const\\s|function\\s|class\\s|interface\\s|type\\s|prototype\\.)${symbol}\\b|${symbol}\\([^)]*\\)\\s*\\{)`;
+	const symbolWithDeclaration = `(${declarationKeywords.map(addTrailingSpace).join('|')})${symbol}\\b`;
+	const prototypeDeclaration = `prototype\\.${symbol}\\b`
+	const methodShorthand = `${symbol}\\([^)]*\\)\\s*\\{`;
+	const regexpParts = [
+		symbolWithDeclaration,
+		prototypeDeclaration,
+		methodShorthand,
+	];
+	return `\\b(${[regexpParts.join('|')]})`;
+}
+
+function addTrailingSpace(keyword) {
+	return keyword + '\\s';
 }
 
 module.exports = getRegexp;
