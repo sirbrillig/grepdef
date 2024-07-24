@@ -63,6 +63,7 @@ use strum_macros::Display;
 use strum_macros::EnumString;
 
 mod file_type;
+mod query_regex;
 mod threads;
 
 /// The command-line arguments to be used by [Searcher]
@@ -335,17 +336,6 @@ impl SearchResult {
     }
 }
 
-fn get_regexp_for_query(query: &str, file_type: &FileType) -> Regex {
-    let regexp_string = match file_type {
-        FileType::JS => &format!(
-            r"(\b(function|var|let|const|class|interface|type)\s+{query}\b|\b{query}\([^)]*\)\s*(:[^\{{]+)?\{{|\b{query}:|@typedef\s*(\{{[^\}}]+\}})?\s*{query}\b)"
-        ),
-        FileType::PHP => &format!(r"\b(function|class|trait|interface|enum) {query}\b"),
-        FileType::RS => &format!(r"\b(fn|trait|enum|struct|mod) {query}\b"),
-    };
-    Regex::new(regexp_string).expect("Could not create regex for file type query")
-}
-
 /// A struct that can perform a search
 ///
 /// This is the main API of this crate.
@@ -384,7 +374,7 @@ impl Searcher {
         } else {
             None
         };
-        let re = get_regexp_for_query(&self.config.query, &self.config.file_type);
+        let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
         let mut pool = threads::ThreadPool::new(self.config.num_threads);
         let results: Vec<SearchResult> = vec![];
