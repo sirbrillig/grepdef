@@ -96,8 +96,13 @@ fn search_returns_matching_function_line_guessing_file_type_from_file_name(
 
 #[rstest]
 #[case(String::from("parseQuery"), String::from("js"))]
+#[case(String::from("parseQuery"), String::from("javascript"))]
+#[case(String::from("parseQuery"), String::from("jsx"))]
+#[case(String::from("parseQuery"), String::from("javascript.jsx"))]
+#[case(String::from("parseQuery"), String::from("javascriptreact"))]
 #[case(String::from("parseQuery"), String::from("php"))]
 #[case(String::from("query_db"), String::from("rs"))]
+#[case(String::from("query_db"), String::from("rust"))]
 fn search_returns_matching_function_line(#[case] query: String, #[case] file_type_string: String) {
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();

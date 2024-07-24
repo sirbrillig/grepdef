@@ -1,4 +1,4 @@
-use grepdef::{Args, SearchResult, Searcher};
+use grepdef::{Args, FileType, SearchResult, Searcher};
 
 pub fn make_args(
     query: String,
@@ -34,10 +34,18 @@ pub fn get_default_fixture_for_file_type_string(file_type_string: &str) -> Resul
         "php" => Ok(String::from("./tests/fixtures/by-language/php-fixture.php")),
         "rs" => Ok(String::from("./tests/fixtures/by-language/rs-fixture.rs")),
         _ => {
-            return Err(format!(
-                "No fixture found for file type '{}'",
-                file_type_string
-            ))
+            let file_type = FileType::from_string(file_type_string);
+            match file_type {
+                Ok(file_type) => {
+                    return get_default_fixture_for_file_type_string(file_type.to_string().as_str())
+                }
+                Err(_) => {
+                    return Err(format!(
+                        "No fixture found for file type '{}'",
+                        file_type_string
+                    ));
+                }
+            }
         }
     }
 }
@@ -53,10 +61,18 @@ pub fn get_expected_text_line_for_test_search(
         "php" => Ok((String::from("function parseQuery() {"), 6)),
         "rs" => Ok((String::from("pub fn query_db() -> bool {}"), 1)),
         _ => {
-            return Err(format!(
-                "No expected text found for file type '{}'",
-                file_type_string
-            ))
+            let file_type = FileType::from_string(file_type_string);
+            match file_type {
+                Ok(file_type) => {
+                    return get_expected_text_line_for_test_search(file_type.to_string().as_str())
+                }
+                Err(_) => {
+                    return Err(format!(
+                        "No expected text found for file type '{}'",
+                        file_type_string
+                    ));
+                }
+            }
         }
     }
 }

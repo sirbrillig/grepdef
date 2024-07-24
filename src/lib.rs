@@ -258,7 +258,17 @@ impl FileType {
             "typescriptreact" => Ok(FileType::JS),
             "php" => Ok(FileType::PHP),
             "rs" => Ok(FileType::RS),
+            "rust" => Ok(FileType::RS),
             _ => Err(format!("Invalid file type '{}'", file_type_string)),
+        }
+    }
+
+    /// Get the textual representation of a [FileType]
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::JS => String::from("js"),
+            Self::PHP => String::from("php"),
+            Self::RS => String::from("rs"),
         }
     }
 
