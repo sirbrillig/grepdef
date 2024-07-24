@@ -7,7 +7,7 @@ use std::io::Read;
 
 pub fn get_regexp_for_file_type(file_type: &FileType) -> Regex {
     let regexp_string = match file_type {
-        FileType::JS => &r"\.(js|jsx|ts|tsx|mjs|cjs)$".to_string(),
+        FileType::JS => &r"\.(:?js|jsx|ts|tsx|mjs|cjs)$".to_string(),
         FileType::PHP => &r"\.php$".to_string(),
         FileType::RS => &r"\.rs$".to_string(),
     };
