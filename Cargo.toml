@@ -2,6 +2,7 @@
 name = "grepdef"
 version = "3.0.0"
 edition = "2021"
+repository = "https://github.com/sirbrillig/grepdef"
 
 [dependencies]
 clap = { version = "4.5.9", features = ["derive"] }
