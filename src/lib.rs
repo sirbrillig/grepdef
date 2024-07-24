@@ -82,6 +82,7 @@ mod threads;
 /// assert_eq!(config.line_number, false); // Do not print line numbers
 /// ```
 #[derive(Parser, Debug, Default)]
+#[command(version)]
 pub struct Args {
     /// (Required) The symbol name (function, class, etc.) to search for
     pub query: String,
