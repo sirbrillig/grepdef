@@ -1,0 +1,15 @@
+[package]
+name = "grepdef"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.9", features = ["derive"] }
+colored = "2.1.0"
+exitcode = "1.1.2"
+ignore = "0.4.22"
+memchr = "2.7.4"
+regex = "1.10.5"
+rstest = "0.21.0"
+strum = "0.26.3"
+strum_macros = "0.26.4"
