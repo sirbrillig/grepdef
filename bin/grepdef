@@ -1,6 +1,0 @@
-#!/usr/bin/env node
-
-const grepdef = require('../index.js');
-
-const args = process.argv.slice(2);
-grepdef(args);
