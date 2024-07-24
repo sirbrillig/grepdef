@@ -55,3 +55,4 @@ const arrayDef = [
 	longhandProperty,
 	shorthandProperty,
 ];
+

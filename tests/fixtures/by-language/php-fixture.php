@@ -16,3 +16,13 @@ trait Bar {
 
 interface Zoom {
 }
+
+enum MyEnum {
+}
+
+class MyClass {
+	public function doSomething(): Foo {
+	}
+	public function doSomethingAbsolute(): \Home\Foo {
+	}
+}
