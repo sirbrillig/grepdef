@@ -24,14 +24,6 @@ If the type is not provided, grepdef will try to guess the filetype, but this ma
 
 Show line numbers (1-based).
 
---searcher &lt;SEARCHER&gt;
-
-Use the specified searcher. Currently only 'ripgrep' is supported.
-
---reporter &lt;REPORTER&gt;
-
-Use the specified reporter. Currently only 'human' is supported.
-
 --no-color
 
 Disable colors in reporters that support them.
@@ -40,13 +32,9 @@ Disable colors in reporters that support them.
 
 Print this help text.
 
--v, --version
+-V, --version
 
 Print the version information.
-
---verbose
-
-Print the raw grep command being run.
 
 ## Example
 
@@ -57,10 +45,10 @@ $ grepdef --type js parseQuery
 
 ## Installing
 
-This tool is a node script, so you must have [node](https://nodejs.org/en/) installed.
+You can install this with [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) by running:
 
 ```
-npm install -g @sirbrillig/grepdef
+cargo install grepdef
 ```
 
 ## Using with editors
@@ -68,7 +56,3 @@ npm install -g @sirbrillig/grepdef
 - vim: See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
 - VS Code: See [vscode-grepdef](https://github.com/sirbrillig/vscode-grepdef)
 
-
-## Acknowledgments
-
-This uses the amazing [ripgrep](https://github.com/BurntSushi/ripgrep) tool for searching and the [vscode-ripgrep](https://github.com/microsoft/vscode-ripgrep) library to install and access it.
