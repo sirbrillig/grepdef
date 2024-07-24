@@ -1,8 +1,10 @@
 # grepdef
 
+A fast command-line tool to search for the definitions of functions, classes, structs, etc. in various programming languages.
+
 Usage: grepdef [options] &lt;symbol&gt; [path(s)]
 
-The **symbol** is the full string name of a class, function, variable, or similar construct.
+The **symbol** is the full string name of a class, function, struct, or similar construct.
 
 The **path** is a relative or absolute file path to a file or a directory or a space-separated series of such paths. You can also use UNIX globs which the shell will turn into paths.
 
