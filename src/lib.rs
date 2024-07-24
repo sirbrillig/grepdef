@@ -83,7 +83,12 @@ mod threads;
 /// assert_eq!(config.line_number, false); // Do not print line numbers
 /// ```
 #[derive(Parser, Debug, Default)]
-#[command(version)]
+#[command(
+    version,
+    arg_required_else_help = true,
+    about = "Quick search for symbol definitions in various programming languages",
+    long_about = "Quick search for symbol definitions in various programming languages"
+)]
 pub struct Args {
     /// (Required) The symbol name (function, class, etc.) to search for
     pub query: String,
