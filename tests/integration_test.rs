@@ -31,9 +31,9 @@ fn search_returns_nothing_for_no_results() {
 #[rstest]
 fn search_returns_matching_js_function_line_with_one_thread() {
     let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
-    let query = String::from("thisFunctionDoesNotExist");
+    let query = String::from("parseQuery");
+    let expected = vec![common::get_expected_search_result_for_file_type("js")];
     let file_type_string = String::from("js");
-    let expected: Vec<SearchResult> = vec![];
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
     args.threads = Some(NonZero::new(1).unwrap());
     assert_eq!(expected, common::do_search(args));
