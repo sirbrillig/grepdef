@@ -17,6 +17,8 @@ The output is like using grep, but will only show places where that symbol is de
 > [!IMPORTANT]
 > grepdef version 3 is a complete rewrite changing from Node to Rust to make it more efficient and to remove the need to have node and ripgrep installed separately.
 
+Since version 3.0.0, grepdef can also be used as a rust library crate for other rust programs. See [the docs](https://docs.rs/grepdef/latest/grepdef/) for details.
+
 ## CLI Options
 
 -t, --type &lt;TYPE&gt;
