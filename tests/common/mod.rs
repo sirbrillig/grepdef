@@ -17,12 +17,20 @@ pub fn make_args(
         debug: false,
         no_color: false,
         threads: None,
+        format: None,
     }
 }
 
 pub fn do_search(args: Args) -> Vec<SearchResult> {
     let searcher = Searcher::new(args).unwrap();
     searcher.search().expect("Search failed for test")
+}
+
+pub fn do_search_format(args: Args) -> Vec<String> {
+    let searcher = Searcher::new(args).unwrap();
+    searcher
+        .search_and_format()
+        .expect("Search failed for test")
 }
 
 pub fn get_default_fixture_for_file_type_string(file_type_string: &str) -> Result<String, String> {
