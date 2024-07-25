@@ -8,10 +8,10 @@ fn main() {
         eprintln!("{err}");
         process::exit(exitcode::USAGE);
     });
-    match searcher.search() {
+    match searcher.search_and_format() {
         Ok(results) => {
             for line in results {
-                println!("{}", line.to_grep());
+                println!("{}", line);
             }
         }
         Err(err) => {
