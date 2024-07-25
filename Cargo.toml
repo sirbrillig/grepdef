@@ -5,6 +5,7 @@ edition = "2021"
 repository = "https://github.com/sirbrillig/grepdef"
 homepage = "https://github.com/sirbrillig/grepdef"
 description = "Quick search for symbol definitions in various programming languages"
+license-file = "LICENSE"
 
 [dependencies]
 clap = { version = "4.5.9", features = ["derive"] }
