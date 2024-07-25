@@ -318,9 +318,9 @@ pub enum SearchResultFormat {
     JsonPerMatch,
 }
 
-/// A result from calling [Searcher::search]
+/// A result from calling [Searcher::search] or [Searcher::search_and_format]
 ///
-/// The `line_number` will be set only if [Args::line_number] is true when calling [Searcher::search].
+/// Note that `line_number` will be set only if [Args::line_number] is true when searching.
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SearchResult {
     /// The path to the file containing the symbol definition
