@@ -360,10 +360,7 @@ impl SearchResult {
 
     /// Return a formatted string for output in the "JSON_PER_MATCH" format
     pub fn to_json_per_match(&self) -> String {
-        match self.line_number {
-            Some(_) => serde_json::to_string(self).unwrap_or_default(),
-            None => format!("FIXME JSON {}:{}", self.file_path.magenta(), self.text),
-        }
+        serde_json::to_string(self).unwrap_or_default()
     }
 }
 
