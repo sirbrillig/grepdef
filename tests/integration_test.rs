@@ -40,6 +40,43 @@ fn search_returns_matching_js_function_line_with_one_thread() {
 }
 
 #[rstest]
+fn to_grep_formats_message_without_number() {
+    let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
+    let query = String::from("parseQuery");
+    let expected_result = common::get_expected_search_result_for_file_type("js");
+    let expected = format!("{}:{}", expected_result.file_path, expected_result.text);
+    let file_type_string = String::from("js");
+    let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
+    args.line_number = false;
+    args.no_color = true;
+    let actual = common::do_search(args);
+    for result in actual {
+        assert_eq!(expected, result.to_grep());
+    }
+}
+
+#[rstest]
+fn to_grep_formats_message_with_number() {
+    let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
+    let query = String::from("parseQuery");
+    let expected_result = common::get_expected_search_result_for_file_type("js");
+    let expected = format!(
+        "{}:{}:{}",
+        expected_result.file_path,
+        expected_result.line_number.unwrap(),
+        expected_result.text
+    );
+    let file_type_string = String::from("js");
+    let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
+    args.line_number = true;
+    args.no_color = true;
+    let actual = common::do_search(args);
+    for result in actual {
+        assert_eq!(expected, result.to_grep());
+    }
+}
+
+#[rstest]
 fn search_returns_matching_js_function_line_with_two_files() {
     let file_path = format!(
         "{} {}",
