@@ -20,14 +20,14 @@
 //!
 //! ```text
 //! $ grepdef parseQuery ./src
-//! // ./src/queries.js:function parseQuery {
+//! ./src/queries.js:function parseQuery {
 //! ```
 //!
 //! Just like `grep`, you can add the `-n` option to include line numbers.
 //!
 //! ```text
 //! $ grepdef -n parseQuery ./src
-//! // ./src/queries.js:17:function parseQuery {
+//! ./src/queries.js:17:function parseQuery {
 //! ```
 //!
 //! The search will be faster if you specify what type of file you are searching for using the
@@ -35,7 +35,7 @@
 //!
 //! ```text
 //! $ grepdef --type js -n parseQuery ./src
-//! // ./src/queries.js:17:function parseQuery {
+//! ./src/queries.js:17:function parseQuery {
 //! ```
 //!
 //! To use the crate from other Rust code, use [Searcher].
