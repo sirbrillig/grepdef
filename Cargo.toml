@@ -1,6 +1,6 @@
 [package]
 name = "grepdef"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2021"
 repository = "https://github.com/sirbrillig/grepdef"
 homepage = "https://github.com/sirbrillig/grepdef"
@@ -16,6 +16,8 @@ ignore = "0.4.22"
 memchr = "2.7.4"
 regex = "1.10.5"
 rstest = "0.21.0"
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.120"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 

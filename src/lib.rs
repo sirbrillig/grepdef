@@ -20,14 +20,14 @@
 //!
 //! ```text
 //! $ grepdef parseQuery ./src
-//! // ./src/queries.js:function parseQuery {
+//! ./src/queries.js:function parseQuery {
 //! ```
 //!
 //! Just like `grep`, you can add the `-n` option to include line numbers.
 //!
 //! ```text
 //! $ grepdef -n parseQuery ./src
-//! // ./src/queries.js:17:function parseQuery {
+//! ./src/queries.js:17:function parseQuery {
 //! ```
 //!
 //! The search will be faster if you specify what type of file you are searching for using the
@@ -35,7 +35,7 @@
 //!
 //! ```text
 //! $ grepdef --type js -n parseQuery ./src
-//! // ./src/queries.js:17:function parseQuery {
+//! ./src/queries.js:17:function parseQuery {
 //! ```
 //!
 //! To use the crate from other Rust code, use [Searcher].
@@ -52,6 +52,7 @@ use clap::Parser;
 use colored::Colorize;
 use ignore::Walk;
 use regex::Regex;
+use serde::Serialize;
 use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, Seek};
@@ -119,6 +120,10 @@ pub struct Args {
     /// (Advanced) The number of threads to use
     #[arg(short = 'j', long = "threads")]
     pub threads: Option<NonZero<usize>>,
+
+    /// The output format; defaults to 'grep'
+    #[arg(long = "format")]
+    pub format: Option<SearchResultFormat>,
 }
 
 impl Args {
@@ -192,6 +197,9 @@ struct Config {
 
     /// The number of threads to use for searching files
     num_threads: NonZero<usize>,
+
+    /// The output format
+    format: SearchResultFormat,
 }
 
 impl Config {
@@ -224,6 +232,7 @@ impl Config {
             no_color: args.no_color,
             search_method: args.search_method.unwrap_or_default(),
             num_threads,
+            format: args.format.unwrap_or_default(),
         };
         debug(&config, format!("Created config {:?}", config).as_str());
         Ok(config)
@@ -298,12 +307,21 @@ impl FileType {
     }
 }
 
-/// A result from calling [Searcher::search]
+/// The output format of [SearchResult::to_string]
+#[derive(clap::ValueEnum, Clone, Default, Debug, EnumString, PartialEq, Display, Copy)]
+pub enum SearchResultFormat {
+    /// grep-like output; colon-separated path, line number, and text
+    #[default]
+    Grep,
+
+    /// JSON output; one document per match
+    JsonPerMatch,
+}
+
+/// A result from calling [Searcher::search] or [Searcher::search_and_format]
 ///
-/// The `line_number` will be set only if [Args::line_number] is true when calling [Searcher::search].
-///
-/// See [SearchResult::to_grep] as the most common formatting output.
-#[derive(Debug, PartialEq, Clone)]
+/// Note that `line_number` will be set only if [Args::line_number] is true when searching.
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SearchResult {
     /// The path to the file containing the symbol definition
     pub file_path: String,
@@ -339,6 +357,11 @@ impl SearchResult {
             None => format!("{}:{}", self.file_path.magenta(), self.text),
         }
     }
+
+    /// Return a formatted string for output in the "JSON_PER_MATCH" format
+    pub fn to_json_per_match(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
 }
 
 /// A struct that can perform a search
@@ -356,8 +379,8 @@ impl SearchResult {
 ///     true
 /// ))
 /// .unwrap();
-/// for result in searcher.search().unwrap() {
-///     println!("{}", result.to_grep());
+/// for result in searcher.search_and_format().unwrap() {
+///     println!("{}", result);
 /// }
 /// ```
 pub struct Searcher {
@@ -371,7 +394,19 @@ impl Searcher {
         Ok(Searcher { config })
     }
 
-    /// Perform the search this struct was built to do
+    /// Perform the search and return formatted strings
+    pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let results = self.search()?;
+        Ok(results
+            .iter()
+            .map(|result| match self.config.format {
+                SearchResultFormat::Grep => result.to_grep(),
+                SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
+            })
+            .collect())
+    }
+
+    /// Perform the search and return [SearchResult] structs
     pub fn search(&self) -> Result<Vec<SearchResult>, Box<dyn Error>> {
         // Don't try to even calculate elapsed time if we are not going to print it
         let start: Option<time::Instant> = if self.config.debug {
