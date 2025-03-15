@@ -290,7 +290,7 @@ fn search_returns_matching_js_function_line_with_filetype_alias(#[case] file_typ
 #[case::php_global_constant(String::from("GLOBALCONSTANT"), String::from("php"), 30)]
 #[case::php_global_define_single(String::from("GLOBALDEFINESINGLE"), String::from("php"), 31)]
 #[case::php_global_define_double(String::from("GLOBALDEFINEDOUBLE"), String::from("php"), 32)]
-#[case::php_global_class_constant(String::from("MYCONSTANT"), String::from("php"), 35)]
+#[case::php_global_class_constant(String::from("MYCONSTANT"), String::from("php"), 36)]
 #[case(String::from("query_db"), String::from("rs"), 1)]
 #[case(String::from("public_func"), String::from("rs"), 6)]
 #[case(String::from("Wrapper"), String::from("rs"), 4)]
