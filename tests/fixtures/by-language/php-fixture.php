@@ -26,3 +26,17 @@ class MyClass {
 	public function doSomethingAbsolute(): \Home\Foo {
 	}
 }
+
+const GLOBALCONSTANT = 77;
+define( 'GLOBALDEFINESINGLE', 42 );
+define( "GLOBALDEFINEDOUBLE", 43 );
+
+class ClassWithConstant {
+	public const MYCONSTANT = 5;
+
+	public function echoConstant(): void {
+		echo self::MYCONSTANT;
+		echo GLOBALCONSTANT;
+		echo GLOBALDEFINE;
+	}
+}

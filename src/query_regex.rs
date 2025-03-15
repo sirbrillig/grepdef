@@ -6,7 +6,9 @@ pub fn get_regex_for_query(query: &str, file_type: &FileType) -> Regex {
         FileType::JS => &format!(
             r"(?:\b(?:function|var|let|const|class|interface|type)\s+{query}\b|\b{query}\([^)]*\)\s*(?::[^\{{]+)?\{{|\b{query}:|@typedef\s*(?:\{{[^\}}]+\}})?\s*{query}\b)"
         ),
-        FileType::PHP => &format!(r"\b(?:function|class|trait|interface|enum) {query}\b"),
+        FileType::PHP => &format!(
+            r#"\b(?:function|class|trait|interface|enum|const) {query}\b|define\s*\(\s*['"]{query}"#
+        ),
         FileType::RS => &format!(r"\b(?:fn|trait|enum|struct|mod) {query}\b"),
     };
     Regex::new(regexp_string).expect("Could not create regex for file type query")
