@@ -7,7 +7,7 @@ pub fn get_regex_for_query(query: &str, file_type: &FileType) -> Regex {
             r"(?:\b(?:function|var|let|const|class|interface|type)\s+{query}\b|\b{query}\([^)]*\)\s*(?::[^\{{]+)?\{{|\b{query}:|@typedef\s*(?:\{{[^\}}]+\}})?\s*{query}\b)"
         ),
         FileType::PHP => &format!(
-            r#"\b(?:function|class|trait|interface|enum|const) {query}\b|define\s*\(\s*['"]{query}\b"#
+            r#"\b(?:function|class|trait|interface|enum|const) {query}\b|\bdefine\s*\(\s*['"]{query}['"]"#
         ),
         FileType::RS => &format!(r"\b(?:fn|trait|enum|struct|mod) {query}\b"),
     };

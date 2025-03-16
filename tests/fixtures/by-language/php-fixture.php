@@ -31,6 +31,8 @@ const GLOBALCONSTANT = 77;
 define( 'GLOBALDEFINESINGLE', 42 );
 define( "GLOBALDEFINEDOUBLE", 43 );
 define( "GLOBALDEFINEDOUBLE_TWO", 41 ); // This is here to make sure that the other searches do not find it
+define('GLOBALDEFINESINGLE_NOSPACE',40);
+define ('GLOBALDEFINESINGLE_LEADSPACE',49);
 
 class ClassWithConstant {
 	public const MYCONSTANT = 5;

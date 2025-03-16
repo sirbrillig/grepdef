@@ -290,7 +290,17 @@ fn search_returns_matching_js_function_line_with_filetype_alias(#[case] file_typ
 #[case::php_global_constant(String::from("GLOBALCONSTANT"), String::from("php"), 30)]
 #[case::php_global_define_single(String::from("GLOBALDEFINESINGLE"), String::from("php"), 31)]
 #[case::php_global_define_double(String::from("GLOBALDEFINEDOUBLE"), String::from("php"), 32)]
-#[case::php_global_class_constant(String::from("MYCONSTANT"), String::from("php"), 36)]
+#[case::php_global_define_nospace(
+    String::from("GLOBALDEFINESINGLE_NOSPACE"),
+    String::from("php"),
+    34
+)]
+#[case::php_global_define_leadspace(
+    String::from("GLOBALDEFINESINGLE_LEADSPACE"),
+    String::from("php"),
+    35
+)]
+#[case::php_global_class_constant(String::from("MYCONSTANT"), String::from("php"), 38)]
 #[case(String::from("query_db"), String::from("rs"), 1)]
 #[case(String::from("public_func"), String::from("rs"), 6)]
 #[case(String::from("Wrapper"), String::from("rs"), 4)]
@@ -307,9 +317,13 @@ fn search_returns_expected_line_number_for_file_type(
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
     let args = common::make_args(query, Some(file_path), Some(file_type_string));
     let actual = common::do_search(args);
-    assert_eq!(1, actual.len());
+    assert_eq!(1, actual.len(), "Did not find exactly one match");
     let first_actual = actual.get(0).expect("Search failed for test");
-    assert_eq!(line_number, first_actual.line_number.unwrap());
+    assert_eq!(
+        line_number,
+        first_actual.line_number.unwrap(),
+        "Match found but it has the wrong line number"
+    );
 }
 
 #[rstest]
