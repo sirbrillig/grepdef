@@ -71,3 +71,6 @@ Alternatively, you can download the executable manually from the [Releases page]
 - vim: See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
 - VS Code: See [vscode-grepdef](https://github.com/sirbrillig/vscode-grepdef)
 
+## Development
+
+Releases are performed by using [cargo-dist](https://opensource.axo.dev/cargo-dist/). Tag a release and push it to GitHub to do everything.
