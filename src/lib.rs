@@ -496,7 +496,13 @@ impl Searcher {
         self.debug("Listening to searcher results");
         for received_results in rx {
             for received_result in received_results {
-                callback(received_result)
+                callback(received_result);
+                // Don't try to even calculate elapsed time if we are not going to print it
+                if let (true, Some(start)) = (self.config.debug, start) {
+                    self.debug(
+                        format!("Found a result in {} ms", start.elapsed().as_millis()).as_str(),
+                    );
+                }
             }
         }
 
