@@ -408,20 +408,25 @@ impl Searcher {
     }
 
     /// Perform the search and run a callback for each formatted string
-    pub fn search_and_format_callback<F>(&self, callback: F)
+    pub fn search_and_format_callback<F, E>(&self, callback: F, error: E)
     where
         F: Fn(String),
+        E: Fn(Box<dyn Error>),
     {
-        self.search_callback(|result| match self.config.format {
-            SearchResultFormat::Grep => callback(result.to_grep()),
-            SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
-        });
+        self.search_callback(
+            |result| match self.config.format {
+                SearchResultFormat::Grep => callback(result.to_grep()),
+                SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
+            },
+            error,
+        );
     }
 
     /// Perform the search and call the callback for each result
-    pub fn search_callback<F>(&self, callback: F)
+    pub fn search_callback<F, E>(&self, callback: F, error: E)
     where
         F: Fn(SearchResult),
+        E: Fn(Box<dyn Error>),
     {
         // Don't try to even calculate elapsed time if we are not going to print it
         let start: Option<time::Instant> = if self.config.debug {
@@ -446,13 +451,22 @@ impl Searcher {
             let (tx, rx) = mpsc::channel();
             for file_path in &self.config.file_paths {
                 for entry in Walk::new(file_path) {
-                    let path = entry.unwrap().into_path(); // TODO: handle errors
+                    let path = match entry {
+                        Ok(path) => path.into_path(),
+                        Err(err) => {
+                            error(Box::new(err));
+                            continue;
+                        }
+                    };
                     if path.is_dir() {
                         continue;
                     }
                     let path = match path.to_str() {
                         Some(p) => p.to_string(),
-                        None => panic!("Error getting string from path"), // TODO: handle errors
+                        None => {
+                            error(Box::from("Error getting string from path"));
+                            continue;
+                        }
                     };
                     if !file_type_re.is_match(&path) {
                         continue;
@@ -468,9 +482,10 @@ impl Searcher {
                             &re1,
                             &path1,
                             &config1,
-                            move |file_results: Vec<SearchResult>| {
-                                tx1.send(file_results).unwrap(); // TODO: handle errors
-                            },
+                            // NOTE: it would be nice to have better error handling for if this
+                            // message send fails, but since error handling would happen through
+                            // message sending, I don't know what else to do other than panic.
+                            move |file_results: Vec<SearchResult>| tx1.send(file_results).unwrap(),
                         );
                     })
                 }
