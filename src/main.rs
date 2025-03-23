@@ -8,15 +8,7 @@ fn main() {
         eprintln!("{err}");
         process::exit(exitcode::USAGE);
     });
-    match searcher.search_and_format() {
-        Ok(results) => {
-            for line in results {
-                println!("{}", line);
-            }
-        }
-        Err(err) => {
-            eprintln!("{err}");
-            process::exit(exitcode::USAGE);
-        }
-    };
+    searcher.search_and_format_callback(|line| {
+        println!("{}", line);
+    });
 }
