@@ -8,7 +8,13 @@ fn main() {
         eprintln!("{err}");
         process::exit(exitcode::USAGE);
     });
-    searcher.search_and_format_callback(|line| {
-        println!("{}", line);
-    });
+    searcher.search_and_format_callback(
+        |line| {
+            println!("{}", line);
+        },
+        |err| {
+            eprintln!("{err}");
+            process::exit(exitcode::USAGE);
+        },
+    );
 }
