@@ -57,6 +57,7 @@ use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, Seek};
 use std::num::NonZero;
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time;
@@ -404,6 +405,101 @@ impl Searcher {
                 SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
             })
             .collect())
+    }
+
+    /// Perform the search and run a callback for each formatted string
+    pub fn search_and_format_callback<F>(&self, callback: F)
+    where
+        F: Fn(String),
+    {
+        self.search_callback(|result| match self.config.format {
+            SearchResultFormat::Grep => callback(result.to_grep()),
+            SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
+        });
+    }
+
+    /// Perform the search and call the callback for each result
+    pub fn search_callback<F>(&self, callback: F)
+    where
+        F: Fn(SearchResult),
+    {
+        // Don't try to even calculate elapsed time if we are not going to print it
+        let start: Option<time::Instant> = if self.config.debug {
+            Some(time::Instant::now())
+        } else {
+            None
+        };
+        let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
+        let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
+        let mut pool = threads::ThreadPool::new(self.config.num_threads);
+
+        if self.config.no_color {
+            colored::control::set_override(false);
+        }
+
+        self.debug("Starting searchers");
+        let mut searched_file_count = 0;
+
+        // Create a scope for tx to live in because it is cloned by all files and we need all
+        // senders to go out of scope for the iterator to end.
+        let rx = {
+            let (tx, rx) = mpsc::channel();
+            for file_path in &self.config.file_paths {
+                for entry in Walk::new(file_path) {
+                    let path = entry.unwrap().into_path(); // TODO: handle errors
+                    if path.is_dir() {
+                        continue;
+                    }
+                    let path = match path.to_str() {
+                        Some(p) => p.to_string(),
+                        None => panic!("Error getting string from path"), // TODO: handle errors
+                    };
+                    if !file_type_re.is_match(&path) {
+                        continue;
+                    }
+                    searched_file_count += 1;
+
+                    let re1 = re.clone();
+                    let path1 = path.clone();
+                    let config1 = self.config.clone();
+                    let tx1 = tx.clone();
+                    pool.execute(move || {
+                        search_file(
+                            &re1,
+                            &path1,
+                            &config1,
+                            move |file_results: Vec<SearchResult>| {
+                                tx1.send(file_results).unwrap(); // TODO: handle errors
+                            },
+                        );
+                    })
+                }
+            }
+            rx
+        };
+
+        self.debug("Listening to searcher results");
+        for received_results in rx {
+            for received_result in received_results {
+                callback(received_result)
+            }
+        }
+
+        self.debug("Waiting for searchers to complete");
+        pool.wait_for_all_jobs_and_stop();
+        self.debug("Searchers complete");
+
+        // Don't try to even calculate elapsed time if we are not going to print it
+        if let (true, Some(start)) = (self.config.debug, start) {
+            self.debug(
+                format!(
+                    "Scanned {} files in {} ms",
+                    searched_file_count,
+                    start.elapsed().as_millis()
+                )
+                .as_str(),
+            );
+        }
     }
 
     /// Perform the search and return [SearchResult] structs
