@@ -397,14 +397,23 @@ impl Searcher {
 
     /// Perform the search and return formatted strings
     pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
-        let results = self.search()?;
-        Ok(results
-            .iter()
-            .map(|result| match self.config.format {
-                SearchResultFormat::Grep => result.to_grep(),
-                SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
-            })
-            .collect())
+        let mut results: Vec<String> = vec![];
+        let mut errors: Vec<Box<dyn Error>> = vec![];
+        let error = |err| {
+            errors.push(err);
+        };
+        self.search_callback(
+            |result| match self.config.format {
+                SearchResultFormat::Grep => results.push(result.to_grep()),
+                SearchResultFormat::JsonPerMatch => results.push(result.to_json_per_match()),
+            },
+            error,
+        );
+        if errors.len() > 0 {
+            // FIXME: let's not use unwrap; there has to be a more idiomatic way
+            return Err(errors.into_iter().nth(0).unwrap());
+        }
+        Ok(results)
     }
 
     /// Perform the search and run a callback for each formatted string
