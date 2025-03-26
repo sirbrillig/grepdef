@@ -417,25 +417,20 @@ impl Searcher {
     }
 
     /// Perform the search and run a callback for each formatted string
-    pub fn search_and_format_callback<F, E>(&self, mut callback: F, error: E)
+    pub fn search_and_format_callback<F>(&self, mut callback: F) -> Result<(), Box<dyn Error>>
     where
         F: FnMut(String),
-        E: FnMut(Box<dyn Error>),
     {
-        self.search_callback(
-            |result| match self.config.format {
-                SearchResultFormat::Grep => callback(result.to_grep()),
-                SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
-            },
-            error,
-        );
+        self.search_callback(|result| match self.config.format {
+            SearchResultFormat::Grep => callback(result.to_grep()),
+            SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
+        })
     }
 
     /// Perform the search and call the callback for each result
-    pub fn search_callback<F, E>(&self, mut callback: F, mut error: E)
+    pub fn search_callback<F>(&self, mut callback: F) -> Result<(), Box<dyn Error>>
     where
         F: FnMut(SearchResult),
-        E: FnMut(Box<dyn Error>),
     {
         // Don't try to even calculate elapsed time if we are not going to print it
         let start: Option<time::Instant> = if self.config.debug {
@@ -463,8 +458,7 @@ impl Searcher {
                     let path = match entry {
                         Ok(path) => path.into_path(),
                         Err(err) => {
-                            error(Box::new(err));
-                            continue;
+                            return Err(Box::new(err));
                         }
                     };
                     if path.is_dir() {
@@ -473,8 +467,7 @@ impl Searcher {
                     let path = match path.to_str() {
                         Some(p) => p.to_string(),
                         None => {
-                            error(Box::from("Error getting string from path"));
-                            continue;
+                            return Err(Box::from("Error getting string from path"));
                         }
                     };
                     if !file_type_re.is_match(&path) {
@@ -530,6 +523,7 @@ impl Searcher {
                 .as_str(),
             );
         }
+        Ok(())
     }
 
     /// Perform the search and return [SearchResult] structs
