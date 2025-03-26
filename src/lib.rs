@@ -411,7 +411,7 @@ impl Searcher {
     pub fn search_and_format_callback<F, E>(&self, mut callback: F, error: E)
     where
         F: FnMut(String),
-        E: Fn(Box<dyn Error>),
+        E: FnMut(Box<dyn Error>),
     {
         self.search_callback(
             |result| match self.config.format {
@@ -423,10 +423,10 @@ impl Searcher {
     }
 
     /// Perform the search and call the callback for each result
-    pub fn search_callback<F, E>(&self, mut callback: F, error: E)
+    pub fn search_callback<F, E>(&self, mut callback: F, mut error: E)
     where
         F: FnMut(SearchResult),
-        E: Fn(Box<dyn Error>),
+        E: FnMut(Box<dyn Error>),
     {
         // Don't try to even calculate elapsed time if we are not going to print it
         let start: Option<time::Instant> = if self.config.debug {
