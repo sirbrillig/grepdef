@@ -408,9 +408,9 @@ impl Searcher {
     }
 
     /// Perform the search and run a callback for each formatted string
-    pub fn search_and_format_callback<F, E>(&self, callback: F, error: E)
+    pub fn search_and_format_callback<F, E>(&self, mut callback: F, error: E)
     where
-        F: Fn(String),
+        F: FnMut(String),
         E: Fn(Box<dyn Error>),
     {
         self.search_callback(
@@ -423,9 +423,9 @@ impl Searcher {
     }
 
     /// Perform the search and call the callback for each result
-    pub fn search_callback<F, E>(&self, callback: F, error: E)
+    pub fn search_callback<F, E>(&self, mut callback: F, error: E)
     where
-        F: Fn(SearchResult),
+        F: FnMut(SearchResult),
         E: Fn(Box<dyn Error>),
     {
         // Don't try to even calculate elapsed time if we are not going to print it
