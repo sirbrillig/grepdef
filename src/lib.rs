@@ -58,8 +58,6 @@ use std::fs;
 use std::io::{self, BufRead, Seek};
 use std::num::NonZero;
 use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::time;
 use strum_macros::Display;
 use strum_macros::EnumString;
@@ -520,81 +518,12 @@ impl Searcher {
 
     /// Perform the search and return [SearchResult] structs
     pub fn search(&self) -> Result<Vec<SearchResult>, Box<dyn Error>> {
-        // Don't try to even calculate elapsed time if we are not going to print it
-        let start: Option<time::Instant> = if self.config.debug {
-            Some(time::Instant::now())
-        } else {
-            None
-        };
-        let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
-        let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
-        let mut pool = threads::ThreadPool::new(self.config.num_threads);
-        let results: Vec<SearchResult> = vec![];
-        let results = Arc::new(Mutex::new(results));
-
-        if self.config.no_color {
-            colored::control::set_override(false);
+        let mut results: Vec<SearchResult> = vec![];
+        let search_result = self.search_callback(|result| results.push(result));
+        match search_result {
+            Ok(_) => Ok(results),
+            Err(err) => Err(err),
         }
-
-        self.debug("Starting searchers");
-        let mut searched_file_count = 0;
-        for file_path in &self.config.file_paths {
-            for entry in Walk::new(file_path) {
-                let path = entry?.into_path();
-                if path.is_dir() {
-                    continue;
-                }
-                let path = match path.to_str() {
-                    Some(p) => p.to_string(),
-                    None => return Err("Error getting string from path".into()),
-                };
-                if !file_type_re.is_match(&path) {
-                    continue;
-                }
-                searched_file_count += 1;
-
-                let re1 = re.clone();
-                let path1 = path.clone();
-                let config1 = self.config.clone();
-                let results1 = Arc::clone(&results);
-                pool.execute(move || {
-                    search_file(
-                        &re1,
-                        &path1,
-                        &config1,
-                        move |file_results: Vec<SearchResult>| {
-                            results1
-                                .lock()
-                                .expect("Unable to collect search data from thread")
-                                .extend(file_results);
-                        },
-                    );
-                })
-            }
-        }
-
-        self.debug("Waiting for searchers to complete");
-        pool.wait_for_all_jobs_and_stop();
-        self.debug("Searchers complete");
-
-        let results = Arc::into_inner(results)
-            .expect("Unable to collect search results from threads: reference counter failed");
-        let results = results
-            .into_inner()
-            .expect("Unable to collect search results from threads: mutex failed");
-
-        // Don't try to even calculate elapsed time if we are not going to print it
-        if let (true, Some(start)) = (self.config.debug, start) {
-            self.debug(
-                format!(
-                    "Scanned {} files in {} ms",
-                    searched_file_count,
-                    start.elapsed().as_millis()
-                )
-                .as_str(),
-            );
-        }
-        Ok(results)
     }
 
     fn debug(&self, output: &str) {
