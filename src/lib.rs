@@ -378,9 +378,12 @@ impl SearchResult {
 ///     true
 /// ))
 /// .unwrap();
+///
 /// for result in searcher.search_and_format().unwrap() {
 ///     println!("{}", result);
 /// }
+///
+/// searcher.search_and_format_callback(|line| println!("{}", line));
 /// ```
 pub struct Searcher {
     config: Config,
