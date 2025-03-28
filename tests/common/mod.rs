@@ -26,11 +26,27 @@ pub fn do_search(args: Args) -> Vec<SearchResult> {
     searcher.search().expect("Search failed for test")
 }
 
+pub fn do_search_callback(args: Args) -> Vec<SearchResult> {
+    let searcher = Searcher::new(args).unwrap();
+    let mut results = vec![];
+    searcher.search_callback(|l| results.push(l)).expect("Search failed for test");
+    results
+}
+
 pub fn do_search_format(args: Args) -> Vec<String> {
     let searcher = Searcher::new(args).unwrap();
     searcher
         .search_and_format()
         .expect("Search failed for test")
+}
+
+pub fn do_search_format_callback(args: Args) -> Vec<String> {
+    let searcher = Searcher::new(args).unwrap();
+    let mut results = vec![];
+    searcher
+        .search_and_format_callback(|l| results.push(l))
+        .expect("Search failed for test");
+    results
 }
 
 pub fn get_default_fixture_for_file_type_string(file_type_string: &str) -> Result<String, String> {
