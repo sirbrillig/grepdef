@@ -538,7 +538,7 @@ impl Searcher {
 
         self.debug("Listening to searcher results");
         let mut result_counter: usize = 0;
-        for received_results in rx {
+        'all_results: for received_results in rx {
             for received_result in received_results {
                 result_counter += 1;
                 callback(received_result);
@@ -549,8 +549,9 @@ impl Searcher {
                     );
                 }
                 if let Some(i) = self.config.limit {
+                    self.debug(format!("This is result {}; limit {}", result_counter, i).as_str());
                     if i >= result_counter {
-                        break;
+                        break 'all_results;
                     }
                 }
             }
