@@ -436,7 +436,7 @@ fn search_returns_limited_expected_line_number_group_for_file_type(
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
-    args.limit = Some(NonZero::new(1).unwrap());
+    args.limit = Some(1);
     let actual = common::do_search(args);
     assert_eq!(1, actual.len(), "Did not find expected number of matches");
     for (i, result) in actual.iter().enumerate() {
