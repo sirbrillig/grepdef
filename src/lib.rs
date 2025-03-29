@@ -114,7 +114,7 @@ pub struct Args {
 
     /// Limit the number of results
     #[arg(short = 'l', long = "limit")]
-    pub limit: Option<NonZero<usize>>,
+    pub limit: Option<usize>,
 
     /// (Advanced) Print debugging information
     #[arg(long = "debug")]
