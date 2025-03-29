@@ -13,6 +13,7 @@ pub fn make_args(
         },
         file_type: file_type_string,
         line_number: true,
+        limit: None,
         search_method: None,
         debug: false,
         no_color: false,

@@ -427,6 +427,28 @@ fn search_returns_expected_line_number_group_for_file_type(
 }
 
 #[rstest]
+#[case::php_non_unique_method(String::from("similarMethod"), String::from("php"), [48, 51])]
+fn search_returns_limited_expected_line_number_group_for_file_type(
+    #[case] query: String,
+    #[case] file_type_string: String,
+    #[case] line_numbers: [usize;2],
+) {
+    let file_path =
+        common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
+    let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
+    args.limit = Some(NonZero::new(1).unwrap());
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len(), "Did not find expected number of matches");
+    for (i, result) in actual.iter().enumerate() {
+        assert_eq!(
+            line_numbers[i],
+            result.line_number.unwrap(),
+            "Match found but it has the wrong line number"
+        );
+    }
+}
+
+#[rstest]
 fn search_returns_matching_js_function_line_for_recursive() {
     let file_path = String::from("./tests");
     let query = String::from("parseQuery");
