@@ -196,6 +196,9 @@ struct Config {
     /// Output debugging info during search if true
     debug: bool,
 
+    /// Limit the number of results
+    limit: Option<usize>,
+
     /// Explicitly disable color output if true
     no_color: bool,
 
@@ -246,6 +249,7 @@ impl Config {
             no_color: args.no_color,
             color,
             search_method: args.search_method.unwrap_or_default(),
+            limit: args.limit,
             num_threads,
             format: args.format.unwrap_or_default(),
         };
@@ -533,14 +537,21 @@ impl Searcher {
         };
 
         self.debug("Listening to searcher results");
+        let mut result_counter: usize = 0;
         for received_results in rx {
             for received_result in received_results {
+                result_counter += 1;
                 callback(received_result);
                 // Don't try to even calculate elapsed time if we are not going to print it
                 if let (true, Some(start)) = (self.config.debug, start) {
                     self.debug(
                         format!("Found a result in {} ms", start.elapsed().as_millis()).as_str(),
                     );
+                }
+                if let Some(i) = self.config.limit {
+                    if i >= result_counter {
+                        break;
+                    }
                 }
             }
         }
