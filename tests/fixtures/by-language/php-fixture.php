@@ -43,3 +43,10 @@ class ClassWithConstant {
 		echo GLOBALDEFINE;
 	}
 }
+
+class ClassWithNonUniqueMethod1 {
+	public function similarMethod() {}
+}
+class ClassWithNonUniqueMethod2 {
+	public function similarMethod() {}
+}
