@@ -525,10 +525,12 @@ impl Searcher {
                             &re1,
                             &path1,
                             &config1,
-                            // NOTE: it would be nice to have better error handling for if this
-                            // message send fails, but since error handling would happen through
-                            // message sending, I don't know what else to do other than panic.
-                            move |file_results: Vec<SearchResult>| tx1.send(file_results).unwrap(),
+                            move |file_results: Vec<SearchResult>| {
+                                // NOTE: it would be nice to have better error handling for if this
+                                // message send fails, but since normal error handling would happen through
+                                // message sending, I don't know what else to do.
+                                let _ = tx1.send(file_results);
+                            }
                         );
                     })
                 }
