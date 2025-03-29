@@ -112,6 +112,10 @@ pub struct Args {
     #[arg(long = "no-color")]
     pub no_color: bool,
 
+    /// Limit the number of results
+    #[arg(short = 'l', long = "limit")]
+    pub limit: Option<NonZero<usize>>,
+
     /// (Advanced) Print debugging information
     #[arg(long = "debug")]
     pub debug: bool,
