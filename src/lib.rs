@@ -479,7 +479,7 @@ impl Searcher {
         };
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
-        let mut pool = threads::ThreadPool::new(self.config.num_threads);
+        let mut pool = threads::ThreadPool::new(self.config.num_threads, self.config.debug);
 
         match self.config.color {
             ColorOption::ALWAYS => colored::control::set_override(true),
@@ -556,6 +556,8 @@ impl Searcher {
                 if let Some(i) = self.config.limit {
                     self.debug(format!("This is result {}; limit {}", result_counter, i).as_str());
                     if i >= result_counter {
+                        self.debug("Limit reached");
+                        pool.stop();
                         break 'all_results;
                     }
                 }
