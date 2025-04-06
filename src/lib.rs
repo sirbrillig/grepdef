@@ -104,6 +104,10 @@ pub struct Args {
     #[arg(short = 'n', long = "line-number")]
     pub line_number: bool,
 
+    /// Control color output ("never", "always", "auto"); default "auto"
+    #[arg(long = "color")]
+    pub color: Option<String>,
+
     /// Disable color (also supports NO_COLOR env)
     #[arg(long = "no-color")]
     pub no_color: bool,
@@ -191,6 +195,9 @@ struct Config {
     /// Explicitly disable color output if true
     no_color: bool,
 
+    /// Explicitly control color output ("never", "always", "auto")
+    color: ColorOption,
+
     /// The [SearchMethod] to use
     search_method: SearchMethod,
 
@@ -216,6 +223,10 @@ impl Config {
             Some(file_type_string) => FileType::from_string(file_type_string.as_str())?,
             None => FileType::from_file_paths(&file_paths)?,
         };
+        let color = match args.color {
+            Some(color_option_string) => ColorOption::from_string(color_option_string.as_str())?,
+            None => ColorOption::AUTO,
+        };
 
         let num_threads = match args.threads {
             Some(threads) => threads,
@@ -229,6 +240,7 @@ impl Config {
             line_number: args.line_number,
             debug: args.debug,
             no_color: args.no_color,
+            color,
             search_method: args.search_method.unwrap_or_default(),
             num_threads,
             format: args.format.unwrap_or_default(),
@@ -303,6 +315,33 @@ impl FileType {
             }
         }
         Err("Unable to guess file type from file paths")
+    }
+}
+
+/// The supported arguments to the color option
+///
+/// You can turn a string into a [ColorOption] using [ColorOption::from_string].
+#[derive(Clone, Debug)]
+pub enum ColorOption {
+    /// Always colorize
+    ALWAYS,
+
+    /// Never colorize
+    NEVER,
+
+    /// Auto-detect colorize
+    AUTO,
+}
+
+impl ColorOption {
+    /// Convert string to ColorOption
+    pub fn from_string(color_option_string: &str) -> Result<ColorOption, String> {
+        match color_option_string {
+            "always" => Ok(ColorOption::ALWAYS),
+            "never" => Ok(ColorOption::NEVER),
+            "auto" => Ok(ColorOption::AUTO),
+            _ => Err(format!("Invalid color option '{}'", color_option_string)),
+        }
     }
 }
 
@@ -431,6 +470,11 @@ impl Searcher {
         let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
         let mut pool = threads::ThreadPool::new(self.config.num_threads);
 
+        match self.config.color {
+            ColorOption::ALWAYS => colored::control::set_override(true),
+            ColorOption::NEVER => colored::control::set_override(false),
+            ColorOption::AUTO => (),
+        }
         if self.config.no_color {
             colored::control::set_override(false);
         }

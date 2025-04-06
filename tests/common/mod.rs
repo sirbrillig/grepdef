@@ -16,6 +16,7 @@ pub fn make_args(
         search_method: None,
         debug: false,
         no_color: false,
+        color: None,
         threads: None,
         format: None,
     }
