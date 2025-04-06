@@ -446,10 +446,13 @@ impl Searcher {
     /// Perform the search and return formatted strings
     pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let results = self.search()?;
-        Ok(results.iter().map(|result| match self.config.format {
-            SearchResultFormat::Grep => result.to_grep(),
-            SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
-        }).collect())
+        Ok(results
+            .iter()
+            .map(|result| match self.config.format {
+                SearchResultFormat::Grep => result.to_grep(),
+                SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
+            })
+            .collect())
     }
 
     /// Perform the search and run a callback for each formatted string
@@ -530,7 +533,7 @@ impl Searcher {
                                 // message send fails, but since normal error handling would happen through
                                 // message sending, I don't know what else to do.
                                 let _ = tx1.send(file_results);
-                            }
+                            },
                         );
                     })
                 }
