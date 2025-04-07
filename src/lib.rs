@@ -555,7 +555,7 @@ impl Searcher {
                 }
                 if let Some(i) = self.config.limit {
                     self.debug(format!("This is result {}; limit {}", result_counter, i).as_str());
-                    if i >= result_counter {
+                    if result_counter >= i {
                         self.debug("Limit reached");
                         pool.stop();
                         break 'all_results;
