@@ -406,11 +406,11 @@ fn search_returns_expected_line_number_for_file_type(
 }
 
 #[rstest]
-#[case::php_non_unique_method(String::from("similarMethod"), String::from("php"), [48, 51])]
+#[case::php_non_unique_method(String::from("similarMethod"), String::from("php"), [48, 51, 54])]
 fn search_returns_expected_line_number_group_for_file_type(
     #[case] query: String,
     #[case] file_type_string: String,
-    #[case] line_numbers: [usize;2],
+    #[case] line_numbers: [usize;3],
 ) {
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
@@ -427,18 +427,21 @@ fn search_returns_expected_line_number_group_for_file_type(
 }
 
 #[rstest]
-#[case::php_non_unique_method(String::from("similarMethod"), String::from("php"), [48, 51])]
+#[case::php_non_unique_method_limit_1(String::from("similarMethod"), String::from("php"), [48, 51, 54], 1)]
+#[case::php_non_unique_method_limit_2(String::from("similarMethod"), String::from("php"), [48, 51, 54], 2)]
+#[case::php_non_unique_method_limit_3(String::from("similarMethod"), String::from("php"), [48, 51, 54], 3)]
 fn search_returns_limited_expected_line_number_group_for_file_type(
     #[case] query: String,
     #[case] file_type_string: String,
-    #[case] line_numbers: [usize;2],
+    #[case] line_numbers: [usize;3],
+    #[case] limit: usize,
 ) {
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
-    args.limit = Some(1);
+    args.limit = Some(limit);
     let actual = common::do_search(args);
-    assert_eq!(1, actual.len(), "Did not find expected number of matches");
+    assert_eq!(limit, actual.len(), "Did not find expected number of matches");
     for (i, result) in actual.iter().enumerate() {
         assert_eq!(
             line_numbers[i],

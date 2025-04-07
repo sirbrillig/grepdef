@@ -50,3 +50,6 @@ class ClassWithNonUniqueMethod1 {
 class ClassWithNonUniqueMethod2 {
 	public function similarMethod() {}
 }
+class ClassWithNonUniqueMethod3 {
+	public function similarMethod() {}
+}
