@@ -112,6 +112,10 @@ pub struct Args {
     #[arg(long = "no-color")]
     pub no_color: bool,
 
+    /// Limit the number of results
+    #[arg(short = 'l', long = "limit")]
+    pub limit: Option<usize>,
+
     /// (Advanced) Print debugging information
     #[arg(long = "debug")]
     pub debug: bool,
@@ -192,6 +196,9 @@ struct Config {
     /// Output debugging info during search if true
     debug: bool,
 
+    /// Limit the number of results
+    limit: Option<usize>,
+
     /// Explicitly disable color output if true
     no_color: bool,
 
@@ -242,6 +249,7 @@ impl Config {
             no_color: args.no_color,
             color,
             search_method: args.search_method.unwrap_or_default(),
+            limit: args.limit,
             num_threads,
             format: args.format.unwrap_or_default(),
         };
@@ -438,10 +446,13 @@ impl Searcher {
     /// Perform the search and return formatted strings
     pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let results = self.search()?;
-        Ok(results.iter().map(|result| match self.config.format {
-            SearchResultFormat::Grep => result.to_grep(),
-            SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
-        }).collect())
+        Ok(results
+            .iter()
+            .map(|result| match self.config.format {
+                SearchResultFormat::Grep => result.to_grep(),
+                SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
+            })
+            .collect())
     }
 
     /// Perform the search and run a callback for each formatted string
@@ -468,7 +479,7 @@ impl Searcher {
         };
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
-        let mut pool = threads::ThreadPool::new(self.config.num_threads);
+        let mut pool = threads::ThreadPool::new(self.config.num_threads, self.config.debug);
 
         match self.config.color {
             ColorOption::ALWAYS => colored::control::set_override(true),
@@ -517,10 +528,12 @@ impl Searcher {
                             &re1,
                             &path1,
                             &config1,
-                            // NOTE: it would be nice to have better error handling for if this
-                            // message send fails, but since error handling would happen through
-                            // message sending, I don't know what else to do other than panic.
-                            move |file_results: Vec<SearchResult>| tx1.send(file_results).unwrap(),
+                            move |file_results: Vec<SearchResult>| {
+                                // NOTE: it would be nice to have better error handling for if this
+                                // message send fails, but since normal error handling would happen through
+                                // message sending, I don't know what else to do.
+                                let _ = tx1.send(file_results);
+                            },
                         );
                     })
                 }
@@ -529,14 +542,24 @@ impl Searcher {
         };
 
         self.debug("Listening to searcher results");
-        for received_results in rx {
+        let mut result_counter: usize = 0;
+        'all_results: for received_results in rx {
             for received_result in received_results {
+                result_counter += 1;
                 callback(received_result);
                 // Don't try to even calculate elapsed time if we are not going to print it
                 if let (true, Some(start)) = (self.config.debug, start) {
                     self.debug(
                         format!("Found a result in {} ms", start.elapsed().as_millis()).as_str(),
                     );
+                }
+                if let Some(i) = self.config.limit {
+                    self.debug(format!("This is result {}; limit {}", result_counter, i).as_str());
+                    if result_counter >= i {
+                        self.debug("Limit reached");
+                        pool.stop();
+                        break 'all_results;
+                    }
                 }
             }
         }
