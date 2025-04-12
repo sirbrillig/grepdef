@@ -108,6 +108,7 @@ pub fn get_expected_text_line_for_test_search(
 pub fn get_expected_search_result_for_file_type(file_type_string: &str) -> SearchResult {
     let (text, line_number) = get_expected_text_line_for_test_search(file_type_string).unwrap();
     SearchResult {
+        event_type: grepdef::SearchEventType::MATCH,
         file_path: get_default_fixture_for_file_type_string(file_type_string).unwrap(),
         line_number: Some(line_number),
         text,
