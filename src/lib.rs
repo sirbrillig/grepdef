@@ -369,18 +369,41 @@ pub enum SearchResultFormat {
 
 /// The type of a search event
 ///
+/// Search events are a concept that really only exists for [SearchResultFormat::JsonList].
+///
+/// When that flag is not enabled, [SearchResult] will have an `event_type` property that is always
+/// [SearchEventType::NONE] and serialized instances of [SearchResult] will exclude the property
+/// entirely.
+///
+/// When [SearchResultFormat::JsonList] is enabled, the list of results will include a
+/// [SearchEventResult] at the start and end of its list with [SearchEventType::START] and
+/// [SearchEventType::END] respectively. Also, each [SearchResult] match will have the `event_type`
+/// property [SearchEventType::MATCH].
+///
 /// Most search events are of type [SearchEventType::MATCH], but [SearchResultFormat::JsonList]
 /// includes results for the start and end of a search as well.
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum SearchEventType {
-    /// The start of a search
+    /// The start of a search. Only present in [SearchResultFormat::JsonList].
     START,
 
-    /// The end of a search
+    /// The end of a search. Only present in [SearchResultFormat::JsonList].
     END,
 
-    /// A match
+    /// A match. Each result will use this in [SearchResultFormat::JsonList].
     MATCH,
+
+    /// An empty type. Primarily used when [SearchResultFormat::JsonList] is not set.
+    NONE,
+}
+
+impl SearchEventType {
+    fn is_empty(&self) -> bool {
+        match self {
+            SearchEventType::NONE => true,
+            _ => false,
+        }
+    }
 }
 
 /// A search event that is not a result but rather just an informative marker
@@ -397,6 +420,7 @@ impl SearchEventResult {
             SearchEventType::START => serde_json::to_string(self).unwrap_or_default() + ",",
             SearchEventType::END => serde_json::to_string(self).unwrap_or_default(),
             SearchEventType::MATCH => serde_json::to_string(self).unwrap_or_default() + ",",
+            SearchEventType::NONE => String::from(""),
         }
     }
 }
@@ -407,6 +431,7 @@ impl SearchEventResult {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SearchResult {
     /// The event type. This will always be [SearchEventType::MATCH].
+    #[serde(skip_serializing_if = "SearchEventType::is_empty")]
     pub event_type: SearchEventType,
 
     /// The path to the file containing the symbol definition
@@ -738,7 +763,10 @@ fn search_file_line_by_line(
             };
 
             Some(SearchResult {
-                event_type: SearchEventType::MATCH,
+                event_type: match config.format {
+                    SearchResultFormat::JsonList => SearchEventType::MATCH,
+                    _ => SearchEventType::NONE,
+                },
                 file_path: String::from(file_path),
                 line_number: if config.line_number {
                     Some(line_counter)
