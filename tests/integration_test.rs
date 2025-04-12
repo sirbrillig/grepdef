@@ -175,6 +175,34 @@ fn search_and_format_returns_formatted_string_for_grep_without_number() {
 }
 
 #[rstest]
+fn search_and_format_returns_formatted_string_for_json_list_with_number() {
+    let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
+    let query = String::from("parseQuery");
+    let expected_result = common::get_expected_search_result_for_file_type("js");
+    let expected = format!(
+        "{{\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}},",
+        expected_result.file_path,
+        expected_result.line_number.unwrap(),
+        expected_result.text
+    );
+    let file_type_string = String::from("js");
+    let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
+    args.line_number = true;
+    args.no_color = true;
+    args.format = Some(SearchResultFormat::JsonList);
+    let actual = common::do_search_format(args);
+    for (i, result) in actual.iter().enumerate() {
+        match i {
+            0 => assert_eq!("[", String::from(result)),
+            1 => assert_eq!("{\"event_type\":\"START\"},", String::from(result)),
+            3 => assert_eq!("{\"event_type\":\"END\"}", String::from(result)),
+            4 => assert_eq!("]", String::from(result)),
+            _ => assert_eq!(expected, String::from(result)),
+        }
+    }
+}
+
+#[rstest]
 fn search_and_format_returns_formatted_string_for_json_per_match_with_number() {
     let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
     let query = String::from("parseQuery");
@@ -235,6 +263,33 @@ fn search_and_format_callback_provides_formatted_string_for_json_per_match_with_
         assert_eq!(expected, result);
     }
 }
+
+#[rstest]
+fn search_and_format_callback_provides_formatted_string_for_json_list_with_number() {
+    let file_path = common::get_default_fixture_for_file_type_string("js").unwrap();
+    let query = String::from("parseQuery");
+    let expected_result = common::get_expected_search_result_for_file_type("js");
+    let expected = format!(
+        "{{\"file_path\":\"{}\",\"line_number\":null,\"text\":\"{}\"}},",
+        expected_result.file_path, expected_result.text
+    );
+    let file_type_string = String::from("js");
+    let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
+    args.line_number = false;
+    args.no_color = true;
+    args.format = Some(SearchResultFormat::JsonList);
+    let actual = common::do_search_format_callback(args);
+    for (i, result) in actual.iter().enumerate() {
+        match i {
+            0 => assert_eq!("[", String::from(result)),
+            1 => assert_eq!("{\"event_type\":\"START\"},", String::from(result)),
+            3 => assert_eq!("{\"event_type\":\"END\"}", String::from(result)),
+            4 => assert_eq!("]", String::from(result)),
+            _ => assert_eq!(expected, String::from(result)),
+        }
+    }
+}
+
 
 #[rstest]
 fn search_returns_matching_js_function_line_with_two_files() {
@@ -410,13 +465,17 @@ fn search_returns_expected_line_number_for_file_type(
 fn search_returns_expected_line_number_group_for_file_type(
     #[case] query: String,
     #[case] file_type_string: String,
-    #[case] line_numbers: [usize;3],
+    #[case] line_numbers: [usize; 3],
 ) {
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
     let args = common::make_args(query, Some(file_path), Some(file_type_string));
     let actual = common::do_search(args);
-    assert_eq!(line_numbers.len(), actual.len(), "Did not find expected number of matches");
+    assert_eq!(
+        line_numbers.len(),
+        actual.len(),
+        "Did not find expected number of matches"
+    );
     for (i, result) in actual.iter().enumerate() {
         assert_eq!(
             line_numbers[i],
@@ -433,7 +492,7 @@ fn search_returns_expected_line_number_group_for_file_type(
 fn search_returns_limited_expected_line_number_group_for_file_type(
     #[case] query: String,
     #[case] file_type_string: String,
-    #[case] line_numbers: [usize;3],
+    #[case] line_numbers: [usize; 3],
     #[case] limit: usize,
 ) {
     let file_path =
@@ -441,7 +500,11 @@ fn search_returns_limited_expected_line_number_group_for_file_type(
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
     args.limit = Some(limit);
     let actual = common::do_search(args);
-    assert_eq!(limit, actual.len(), "Did not find expected number of matches");
+    assert_eq!(
+        limit,
+        actual.len(),
+        "Did not find expected number of matches"
+    );
     for (i, result) in actual.iter().enumerate() {
         assert_eq!(
             line_numbers[i],

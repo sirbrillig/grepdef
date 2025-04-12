@@ -31,7 +31,9 @@ pub fn do_search(args: Args) -> Vec<SearchResult> {
 pub fn do_search_callback(args: Args) -> Vec<SearchResult> {
     let searcher = Searcher::new(args).unwrap();
     let mut results = vec![];
-    searcher.search_callback(|l| results.push(l)).expect("Search failed for test");
+    searcher
+        .search_callback(|l| results.push(l))
+        .expect("Search failed for test");
     results
 }
 
