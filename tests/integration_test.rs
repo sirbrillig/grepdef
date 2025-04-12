@@ -250,12 +250,14 @@ fn search_and_format_callback_provides_formatted_string_for_json_per_match_with_
     let query = String::from("parseQuery");
     let expected_result = common::get_expected_search_result_for_file_type("js");
     let expected = format!(
-        "{{\"file_path\":\"{}\",\"line_number\":null,\"text\":\"{}\"}}",
-        expected_result.file_path, expected_result.text
+        "{{\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}}",
+        expected_result.file_path,
+        expected_result.line_number.unwrap(),
+        expected_result.text
     );
     let file_type_string = String::from("js");
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
-    args.line_number = false;
+    args.line_number = true;
     args.no_color = true;
     args.format = Some(SearchResultFormat::JsonPerMatch);
     let actual = common::do_search_format_callback(args);
@@ -270,12 +272,14 @@ fn search_and_format_callback_provides_formatted_string_for_json_list_with_numbe
     let query = String::from("parseQuery");
     let expected_result = common::get_expected_search_result_for_file_type("js");
     let expected = format!(
-        "{{\"file_path\":\"{}\",\"line_number\":null,\"text\":\"{}\"}},",
-        expected_result.file_path, expected_result.text
+        "{{\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}},",
+        expected_result.file_path,
+        expected_result.line_number.unwrap(),
+        expected_result.text
     );
     let file_type_string = String::from("js");
     let mut args = common::make_args(query, Some(file_path), Some(file_type_string));
-    args.line_number = false;
+    args.line_number = true;
     args.no_color = true;
     args.format = Some(SearchResultFormat::JsonList);
     let actual = common::do_search_format_callback(args);
