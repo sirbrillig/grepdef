@@ -208,7 +208,7 @@ fn search_and_format_returns_formatted_string_for_json_per_match_with_number() {
     let query = String::from("parseQuery");
     let expected_result = common::get_expected_search_result_for_file_type("js");
     let expected = format!(
-        "{{\"event_type\":\"MATCH\",\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}}",
+        "{{\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}}",
         expected_result.file_path,
         expected_result.line_number.unwrap(),
         expected_result.text
@@ -230,7 +230,7 @@ fn search_and_format_returns_formatted_string_for_json_per_match_without_number(
     let query = String::from("parseQuery");
     let expected_result = common::get_expected_search_result_for_file_type("js");
     let expected = format!(
-        "{{\"event_type\":\"MATCH\",\"file_path\":\"{}\",\"line_number\":null,\"text\":\"{}\"}}",
+        "{{\"file_path\":\"{}\",\"line_number\":null,\"text\":\"{}\"}}",
         expected_result.file_path, expected_result.text
     );
     let file_type_string = String::from("js");
@@ -250,7 +250,7 @@ fn search_and_format_callback_provides_formatted_string_for_json_per_match_with_
     let query = String::from("parseQuery");
     let expected_result = common::get_expected_search_result_for_file_type("js");
     let expected = format!(
-        "{{\"event_type\":\"MATCH\",\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}}",
+        "{{\"file_path\":\"{}\",\"line_number\":{},\"text\":\"{}\"}}",
         expected_result.file_path,
         expected_result.line_number.unwrap(),
         expected_result.text
@@ -573,7 +573,7 @@ fn search_returns_matching_php_function_line_guessing_file_type_from_directory()
     let query = String::from("otherPhpFunction");
     let line_number = Some(3);
     let expected = vec![SearchResult {
-        event_type: grepdef::SearchEventType::MATCH,
+        event_type: grepdef::SearchEventType::NONE,
         file_path: file_path.clone(),
         line_number,
         text: String::from("function otherPhpFunction() {"),
