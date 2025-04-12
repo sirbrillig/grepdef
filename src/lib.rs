@@ -367,13 +367,20 @@ pub enum SearchResultFormat {
     JsonList,
 }
 
-#[derive(serde::Serialize)]
-enum SearchEventType {
+/// The type of a search event
+///
+/// Most search events are of type [SearchEventType::MATCH], but [SearchResultFormat::JsonList]
+/// includes results for the start and end of a search as well.
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum SearchEventType {
     /// The start of a search
     START,
 
     /// The end of a search
     END,
+
+    /// A match
+    MATCH,
 }
 
 /// A search event that is not a result but rather just an informative marker
@@ -389,6 +396,7 @@ impl SearchEventResult {
         match self.event_type {
             SearchEventType::START => serde_json::to_string(self).unwrap_or_default() + ",",
             SearchEventType::END => serde_json::to_string(self).unwrap_or_default(),
+            SearchEventType::MATCH => serde_json::to_string(self).unwrap_or_default() + ",",
         }
     }
 }
@@ -398,6 +406,9 @@ impl SearchEventResult {
 /// Note that `line_number` will be set only if [Args::line_number] is true when searching.
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SearchResult {
+    /// The event type. This will always be [SearchEventType::MATCH].
+    pub event_type: SearchEventType,
+
     /// The path to the file containing the symbol definition
     pub file_path: String,
 
@@ -727,6 +738,7 @@ fn search_file_line_by_line(
             };
 
             Some(SearchResult {
+                event_type: SearchEventType::MATCH,
                 file_path: String::from(file_path),
                 line_number: if config.line_number {
                     Some(line_counter)
