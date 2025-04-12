@@ -353,7 +353,7 @@ impl ColorOption {
     }
 }
 
-/// The output format of [SearchResult::to_string]
+/// The output format of [SearchResult]
 #[derive(clap::ValueEnum, Clone, Default, Debug, EnumString, PartialEq, Display, Copy)]
 pub enum SearchResultFormat {
     /// grep-like output; colon-separated path, line number, and text
@@ -362,6 +362,67 @@ pub enum SearchResultFormat {
 
     /// JSON output; one document per match
     JsonPerMatch,
+
+    /// JSON output; one array document with all results
+    JsonList,
+}
+
+/// The type of a search event
+///
+/// Search events are a concept that really only exists for [SearchResultFormat::JsonList].
+///
+/// When that flag is not enabled, [SearchResult] will have an `event_type` property that is always
+/// [SearchEventType::NONE] and serialized instances of [SearchResult] will exclude the property
+/// entirely.
+///
+/// When [SearchResultFormat::JsonList] is enabled, the list of results will include a
+/// [SearchEventResult] at the start and end of its list with [SearchEventType::START] and
+/// [SearchEventType::END] respectively. Also, each [SearchResult] match will have the `event_type`
+/// property [SearchEventType::MATCH].
+///
+/// Most search events are of type [SearchEventType::MATCH], but [SearchResultFormat::JsonList]
+/// includes results for the start and end of a search as well.
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum SearchEventType {
+    /// The start of a search. Only present in [SearchResultFormat::JsonList].
+    START,
+
+    /// The end of a search. Only present in [SearchResultFormat::JsonList].
+    END,
+
+    /// A match. Each result will use this in [SearchResultFormat::JsonList].
+    MATCH,
+
+    /// An empty type. Primarily used when [SearchResultFormat::JsonList] is not set.
+    NONE,
+}
+
+impl SearchEventType {
+    fn is_empty(&self) -> bool {
+        match self {
+            SearchEventType::NONE => true,
+            _ => false,
+        }
+    }
+}
+
+/// A search event that is not a result but rather just an informative marker
+///
+/// This is required because the [SearchResultFormat::JsonList] format needs "start" and "end" markers.
+#[derive(serde::Serialize)]
+struct SearchEventResult {
+    pub event_type: SearchEventType,
+}
+
+impl SearchEventResult {
+    pub fn to_json_in_list(&self) -> String {
+        match self.event_type {
+            SearchEventType::START => serde_json::to_string(self).unwrap_or_default() + ",",
+            SearchEventType::END => serde_json::to_string(self).unwrap_or_default(),
+            SearchEventType::MATCH => serde_json::to_string(self).unwrap_or_default() + ",",
+            SearchEventType::NONE => String::from(""),
+        }
+    }
 }
 
 /// A result from calling [Searcher::search] or [Searcher::search_and_format]
@@ -369,6 +430,10 @@ pub enum SearchResultFormat {
 /// Note that `line_number` will be set only if [Args::line_number] is true when searching.
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SearchResult {
+    /// The event type. This will always be [SearchEventType::MATCH].
+    #[serde(skip_serializing_if = "SearchEventType::is_empty")]
+    pub event_type: SearchEventType,
+
     /// The path to the file containing the symbol definition
     pub file_path: String,
 
@@ -404,9 +469,14 @@ impl SearchResult {
         }
     }
 
-    /// Return a formatted string for output in the "JSON_PER_MATCH" format
+    /// Return a formatted string for output in the [SearchResultFormat::JsonPerMatch] format
     pub fn to_json_per_match(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
+    }
+
+    /// Return a formatted string for output in the [SearchResultFormat::JsonList] format
+    pub fn to_json_in_list(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default() + ","
     }
 }
 
@@ -445,14 +515,12 @@ impl Searcher {
 
     /// Perform the search and return formatted strings
     pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
-        let results = self.search()?;
-        Ok(results
-            .iter()
-            .map(|result| match self.config.format {
-                SearchResultFormat::Grep => result.to_grep(),
-                SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
-            })
-            .collect())
+        let mut results: Vec<String> = vec![];
+        let error = self.search_and_format_callback(|result| results.push(result));
+        match error {
+            Ok(_) => Ok(results),
+            Err(err) => Err(err),
+        }
     }
 
     /// Perform the search and run a callback for each formatted string
@@ -460,10 +528,26 @@ impl Searcher {
     where
         F: FnMut(String),
     {
-        self.search_callback(|result| match self.config.format {
+        if self.config.format == SearchResultFormat::JsonList {
+            callback(String::from("["));
+            let event = SearchEventResult {
+                event_type: SearchEventType::START,
+            };
+            callback(event.to_json_in_list());
+        }
+        let error = self.search_callback(|result| match self.config.format {
             SearchResultFormat::Grep => callback(result.to_grep()),
             SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
-        })
+            SearchResultFormat::JsonList => callback(result.to_json_in_list()),
+        });
+        if self.config.format == SearchResultFormat::JsonList {
+            let event = SearchEventResult {
+                event_type: SearchEventType::END,
+            };
+            callback(event.to_json_in_list());
+            callback(String::from("]"));
+        }
+        error
     }
 
     /// Perform the search and call the callback for each result
@@ -679,6 +763,10 @@ fn search_file_line_by_line(
             };
 
             Some(SearchResult {
+                event_type: match config.format {
+                    SearchResultFormat::JsonList => SearchEventType::MATCH,
+                    _ => SearchEventType::NONE,
+                },
                 file_path: String::from(file_path),
                 line_number: if config.line_number {
                     Some(line_counter)

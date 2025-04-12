@@ -31,7 +31,9 @@ pub fn do_search(args: Args) -> Vec<SearchResult> {
 pub fn do_search_callback(args: Args) -> Vec<SearchResult> {
     let searcher = Searcher::new(args).unwrap();
     let mut results = vec![];
-    searcher.search_callback(|l| results.push(l)).expect("Search failed for test");
+    searcher
+        .search_callback(|l| results.push(l))
+        .expect("Search failed for test");
     results
 }
 
@@ -106,6 +108,7 @@ pub fn get_expected_text_line_for_test_search(
 pub fn get_expected_search_result_for_file_type(file_type_string: &str) -> SearchResult {
     let (text, line_number) = get_expected_text_line_for_test_search(file_type_string).unwrap();
     SearchResult {
+        event_type: grepdef::SearchEventType::NONE,
         file_path: get_default_fixture_for_file_type_string(file_type_string).unwrap(),
         line_number: Some(line_number),
         text,
