@@ -23,7 +23,7 @@ impl Worker {
     ) -> Worker {
         let thread = thread::spawn(move || loop {
             // If the controller says to stop, ignore remaining jobs on the receiver and just stop.
-            if ! controller.is_empty() {
+            if !controller.is_empty() {
                 if debug {
                     println!("thread {}: {}", id, "Controller said to stop".red());
                 }

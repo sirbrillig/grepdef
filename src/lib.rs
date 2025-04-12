@@ -353,7 +353,7 @@ impl ColorOption {
     }
 }
 
-/// The output format of [SearchResult::to_string]
+/// The output format of [SearchResult]
 #[derive(clap::ValueEnum, Clone, Default, Debug, EnumString, PartialEq, Display, Copy)]
 pub enum SearchResultFormat {
     /// grep-like output; colon-separated path, line number, and text
@@ -362,6 +362,35 @@ pub enum SearchResultFormat {
 
     /// JSON output; one document per match
     JsonPerMatch,
+
+    /// JSON output; one array document with all results
+    JsonList,
+}
+
+#[derive(serde::Serialize)]
+enum SearchEventType {
+    /// The start of a search
+    START,
+
+    /// The end of a search
+    END,
+}
+
+/// A search event that is not a result but rather just an informative marker
+///
+/// This is required because the [SearchResultFormat::JsonList] format needs "start" and "end" markers.
+#[derive(serde::Serialize)]
+struct SearchEventResult {
+    pub event_type: SearchEventType,
+}
+
+impl SearchEventResult {
+    pub fn to_json_in_list(&self) -> String {
+        match self.event_type {
+            SearchEventType::START => serde_json::to_string(self).unwrap_or_default() + ",",
+            SearchEventType::END => serde_json::to_string(self).unwrap_or_default(),
+        }
+    }
 }
 
 /// A result from calling [Searcher::search] or [Searcher::search_and_format]
@@ -404,9 +433,14 @@ impl SearchResult {
         }
     }
 
-    /// Return a formatted string for output in the "JSON_PER_MATCH" format
+    /// Return a formatted string for output in the [SearchResultFormat::JsonPerMatch] format
     pub fn to_json_per_match(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
+    }
+
+    /// Return a formatted string for output in the [SearchResultFormat::JsonList] format
+    pub fn to_json_in_list(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default() + ","
     }
 }
 
@@ -451,6 +485,7 @@ impl Searcher {
             .map(|result| match self.config.format {
                 SearchResultFormat::Grep => result.to_grep(),
                 SearchResultFormat::JsonPerMatch => result.to_json_per_match(),
+                SearchResultFormat::JsonList => result.to_json_in_list(),
             })
             .collect())
     }
@@ -460,10 +495,26 @@ impl Searcher {
     where
         F: FnMut(String),
     {
-        self.search_callback(|result| match self.config.format {
+        if self.config.format == SearchResultFormat::JsonList {
+            callback(String::from("["));
+            let event = SearchEventResult {
+                event_type: SearchEventType::START,
+            };
+            callback(event.to_json_in_list());
+        }
+        let error = self.search_callback(|result| match self.config.format {
             SearchResultFormat::Grep => callback(result.to_grep()),
             SearchResultFormat::JsonPerMatch => callback(result.to_json_per_match()),
-        })
+            SearchResultFormat::JsonList => callback(result.to_json_in_list()),
+        });
+        if self.config.format == SearchResultFormat::JsonList {
+            let event = SearchEventResult {
+                event_type: SearchEventType::END,
+            };
+            callback(event.to_json_in_list());
+            callback(String::from("]"));
+        }
+        error
     }
 
     /// Perform the search and call the callback for each result
