@@ -68,9 +68,9 @@ Alternatively, you can download the executable manually from the [Releases page]
 
 ## Using with editors
 
-- vim: See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
-- VS Code: See [vscode-grepdef](https://github.com/sirbrillig/vscode-grepdef)
+-   vim: See [vim-grepdef](https://github.com/sirbrillig/vim-grepdef)
+-   VS Code: See [vscode-grepdef](https://github.com/sirbrillig/vscode-grepdef)
 
 ## Development
 
-Releases are performed by using [cargo-dist](https://opensource.axo.dev/cargo-dist/). Tag a release and push it to GitHub to do everything.
+Releases are performed by using [cargo-dist](https://github.com/axodotdev/cargo-dist). Tag a release (make sure to bump the version number in the code and re-run `cargo build` first!) and push it to GitHub to generate the release in GitHub. Then you can run `cargo publish` to send the release to the cargo system.
