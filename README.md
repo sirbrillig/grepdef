@@ -52,17 +52,28 @@ $ grepdef --type js -n parseQuery
 
 ## Installing
 
-To upgrade from version 1 or 2, first you'll need to uninstall the old version using the following command:
+> [!NOTE]
+> To upgrade from version 1 or 2, first you'll need to uninstall the old version using the following command:
+>
+> `npm uninstall -g @sirbrillig/grepdef`
+
+### Homebrew
+
+If you use [homebrew](https://brew.sh/) you can install grepdef as follows:
 
 ```
-npm uninstall -g @sirbrillig/grepdef
+brew install grepdef
 ```
+
+### Cargo
 
 You can install grepdef with [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) by running:
 
 ```
 cargo install grepdef
 ```
+
+### Binaries
 
 Alternatively, you can download the executable manually from the [Releases page](https://github.com/sirbrillig/grepdef/releases) and install it however you like.
 
