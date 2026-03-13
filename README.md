@@ -62,7 +62,7 @@ $ grepdef --type js -n parseQuery
 If you use [homebrew](https://brew.sh/) you can install grepdef as follows:
 
 ```
-brew install grepdef
+brew install sirbrillig/tap/grepdef
 ```
 
 ### Cargo
