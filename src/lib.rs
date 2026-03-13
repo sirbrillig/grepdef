@@ -272,6 +272,9 @@ pub enum FileType {
 
     /// The Rust file type
     RS,
+
+    /// The Python file type
+    PY,
 }
 
 impl FileType {
@@ -294,6 +297,8 @@ impl FileType {
             "php" => Ok(FileType::PHP),
             "rs" => Ok(FileType::RS),
             "rust" => Ok(FileType::RS),
+            "py" => Ok(FileType::PY),
+            "python" => Ok(FileType::PY),
             _ => Err(format!("Invalid file type '{}'", file_type_string)),
         }
     }
@@ -304,6 +309,7 @@ impl FileType {
             Self::JS => String::from("js"),
             Self::PHP => String::from("php"),
             Self::RS => String::from("rs"),
+            Self::PY => String::from("py"),
         }
     }
 

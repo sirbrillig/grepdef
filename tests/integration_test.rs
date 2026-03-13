@@ -583,9 +583,52 @@ fn search_returns_matching_php_function_line_guessing_file_type_from_directory()
 }
 
 #[rstest]
+fn search_returns_matching_py_function_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("py").unwrap();
+    let query = String::from("parse_query");
+    let expected = vec![common::get_expected_search_result_for_file_type("py")];
+    let file_type_string = String::from("py");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    assert_eq!(expected, common::do_search(args));
+}
+
+#[rstest]
+fn search_returns_matching_py_class_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("py").unwrap();
+    let query = String::from("QueryParser");
+    let file_type_string = String::from("py");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len());
+    assert_eq!("class QueryParser:", actual[0].text);
+}
+
+#[rstest]
+fn search_returns_matching_py_async_function_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("py").unwrap();
+    let query = String::from("async_parse");
+    let file_type_string = String::from("py");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len());
+    assert_eq!("async def async_parse(query):", actual[0].text);
+}
+
+#[rstest]
+fn search_returns_nothing_for_py_partial_match() {
+    let file_path = common::get_default_fixture_for_file_type_string("py").unwrap();
+    let query = String::from("parse");
+    let file_type_string = String::from("py");
+    let expected: Vec<SearchResult> = vec![];
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    assert_eq!(expected, common::do_search(args));
+}
+
+#[rstest]
 #[case(String::from("parseQuery"), String::from("js"))]
 #[case(String::from("parseQuery"), String::from("php"))]
 #[case(String::from("query_db"), String::from("rs"))]
+#[case(String::from("parse_query"), String::from("py"))]
 fn search_returns_matching_function_line_for_recursive(
     #[case] query: String,
     #[case] file_type_string: String,
