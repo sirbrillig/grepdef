@@ -10,6 +10,7 @@ pub fn get_regex_for_query(query: &str, file_type: &FileType) -> Regex {
             r#"\b(?:function|class|trait|interface|enum|const) {query}\b|\bdefine\s*\(\s*['"]{query}['"]"#
         ),
         FileType::RS => &format!(r"\b(?:fn|trait|enum|struct|mod) {query}\b"),
+        FileType::PY => &format!(r"\b(?:(?:async\s+)?def|class)\s+{query}\b"),
     };
     Regex::new(regexp_string).expect("Could not create regex for file type query")
 }
