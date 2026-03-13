@@ -5,21 +5,20 @@ use regex::Regex;
 use std::fs;
 use std::io::Read;
 
-pub fn get_regexp_for_file_type(file_type: &FileType) -> Regex {
-    let regexp_string = match file_type {
-        FileType::JS => &r"\.(:?js|jsx|ts|tsx|mjs|cjs)$".to_string(),
-        FileType::PHP => &r"\.php$".to_string(),
-        FileType::RS => &r"\.rs$".to_string(),
-        FileType::PY => &r"\.py$".to_string(),
-    };
-    Regex::new(regexp_string).expect("Could not create regex for file extension")
+pub fn path_matches_file_type(path: &str, file_type: &FileType) -> bool {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    match file_type {
+        FileType::JS => matches!(ext, "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs"),
+        FileType::PHP => ext == "php",
+        FileType::RS => ext == "rs",
+        FileType::PY => ext == "py",
+    }
 }
 
 pub fn guess_file_type_from_file_path(file_path: &str) -> Option<FileType> {
-    let js_regex = get_regexp_for_file_type(&FileType::JS);
-    let php_regex = get_regexp_for_file_type(&FileType::PHP);
-    let rs_regex = get_regexp_for_file_type(&FileType::RS);
-    let py_regex = get_regexp_for_file_type(&FileType::PY);
     for entry in Walk::new(file_path) {
         let path = match entry {
             Ok(path) => path.into_path(),
@@ -28,21 +27,16 @@ pub fn guess_file_type_from_file_path(file_path: &str) -> Option<FileType> {
         if path.is_dir() {
             continue;
         }
-        let path = match path.to_str() {
-            Some(p) => p.to_string(),
-            None => String::from(""),
-        };
-        if js_regex.is_match(&path) {
-            return Some(FileType::JS);
-        }
-        if php_regex.is_match(&path) {
-            return Some(FileType::PHP);
-        }
-        if rs_regex.is_match(&path) {
-            return Some(FileType::RS);
-        }
-        if py_regex.is_match(&path) {
-            return Some(FileType::PY);
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        match ext {
+            "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" => return Some(FileType::JS),
+            "php" => return Some(FileType::PHP),
+            "rs" => return Some(FileType::RS),
+            "py" => return Some(FileType::PY),
+            _ => continue,
         }
     }
     None

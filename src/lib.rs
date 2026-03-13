@@ -568,7 +568,6 @@ impl Searcher {
             None
         };
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
-        let file_type_re = file_type::get_regexp_for_file_type(&self.config.file_type);
         let mut pool = threads::ThreadPool::new(self.config.num_threads, self.config.debug);
 
         match self.config.color {
@@ -604,7 +603,7 @@ impl Searcher {
                             return Err(Box::from("Error getting string from path"));
                         }
                     };
-                    if !file_type_re.is_match(&path) {
+                    if !file_type::path_matches_file_type(&path, &self.config.file_type) {
                         continue;
                     }
                     searched_file_count += 1;
