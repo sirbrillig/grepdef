@@ -57,7 +57,7 @@ use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, Seek};
 use std::num::NonZero;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::time;
 use strum_macros::Display;
 use strum_macros::EnumString;
@@ -568,14 +568,15 @@ impl Searcher {
             None
         };
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
-        let mut pool = threads::ThreadPool::new(self.config.num_threads, self.config.debug);
+        let config = Arc::new(self.config.clone());
+        let mut pool = threads::ThreadPool::new(config.num_threads, config.debug);
 
-        match self.config.color {
+        match config.color {
             ColorOption::ALWAYS => colored::control::set_override(true),
             ColorOption::NEVER => colored::control::set_override(false),
             ColorOption::AUTO => (),
         }
-        if self.config.no_color {
+        if config.no_color {
             colored::control::set_override(false);
         }
 
@@ -586,7 +587,7 @@ impl Searcher {
         // senders to go out of scope for the iterator to end.
         let rx = {
             let (tx, rx) = mpsc::channel();
-            for file_path in &self.config.file_paths {
+            for file_path in &config.file_paths {
                 for entry in Walk::new(file_path) {
                     let path = match entry {
                         Ok(path) => path.into_path(),
@@ -603,14 +604,14 @@ impl Searcher {
                             return Err(Box::from("Error getting string from path"));
                         }
                     };
-                    if !file_type::path_matches_file_type(&path, &self.config.file_type) {
+                    if !file_type::path_matches_file_type(&path, &config.file_type) {
                         continue;
                     }
                     searched_file_count += 1;
 
                     let re1 = re.clone();
                     let path1 = path.clone();
-                    let config1 = self.config.clone();
+                    let config1 = Arc::clone(&config);
                     let tx1 = tx.clone();
                     pool.execute(move || {
                         search_file(
