@@ -96,7 +96,7 @@ pub struct Args {
     /// The file path(s) to search; recursively searches directories and respects .gitignore
     pub file_path: Option<Vec<String>>,
 
-    /// The file type to search (js, php, rs); will guess if not set but this is slower
+    /// The file type to search (js, php, rs, ts, py); will guess if not set
     #[arg(short = 't', long = "type")]
     pub file_type: Option<String>,
 
