@@ -23,7 +23,7 @@ Since version 3.0.0, grepdef can also be used as a rust library crate for other 
 
 -t, --type &lt;TYPE&gt;
 
-The type is a vim-compatible filetype. One of 'js', 'php', 'rs', 'py', or an alias for those strings (eg: 'javascript.jsx'). TypeScript is currently considered part of JavaScript so a type of 'typescript' is equivalent to 'js'. Python can also be specified as 'python'.
+The type is a vim-compatible filetype. One of 'js', 'php', 'rs', 'py', 'rb', or an alias for those strings (eg: 'javascript.jsx'). TypeScript is currently considered part of JavaScript so a type of 'typescript' is equivalent to 'js'. Python can also be specified as 'python'. Ruby can also be specified as 'ruby'.
 
 If the type is not provided, grepdef will try to guess the filetype, but this may be inaccurate.
 

@@ -336,6 +336,7 @@ fn search_returns_matching_js_function_line_with_one_file_one_directory_matching
 #[case(String::from("parseQuery"), String::from("js"))]
 #[case(String::from("parseQuery"), String::from("php"))]
 #[case(String::from("query_db"), String::from("rs"))]
+#[case(String::from("parse_query"), String::from("rb"))]
 fn search_returns_matching_function_line_guessing_file_type_from_file_name(
     #[case] query: String,
     #[case] file_type_string: String,
@@ -358,6 +359,8 @@ fn search_returns_matching_function_line_guessing_file_type_from_file_name(
 #[case(String::from("parseQuery"), String::from("php"))]
 #[case(String::from("query_db"), String::from("rs"))]
 #[case(String::from("query_db"), String::from("rust"))]
+#[case(String::from("parse_query"), String::from("rb"))]
+#[case(String::from("parse_query"), String::from("ruby"))]
 fn search_returns_matching_function_line(#[case] query: String, #[case] file_type_string: String) {
     let file_path =
         common::get_default_fixture_for_file_type_string(file_type_string.as_str()).unwrap();
@@ -445,6 +448,12 @@ fn search_returns_matching_js_function_line_with_filetype_alias(#[case] file_typ
 #[case(String::from("ContainerWithBlock"), String::from("rs"), 11)]
 #[case(String::from("FileType"), String::from("rs"), 19)]
 #[case(String::from("search_file"), String::from("rs"), 29)]
+#[case(String::from("parse_query"), String::from("rb"), 1)]
+#[case(String::from("parse_query_fake"), String::from("rb"), 5)]
+#[case(String::from("QueryParser"), String::from("rb"), 9)]
+#[case(String::from("QueryParserFake"), String::from("rb"), 17)]
+#[case(String::from("QueryModule"), String::from("rb"), 20)]
+#[case(String::from("module_method"), String::from("rb"), 21)]
 fn search_returns_expected_line_number_for_file_type(
     #[case] query: String,
     #[case] file_type_string: String,
@@ -629,6 +638,7 @@ fn search_returns_nothing_for_py_partial_match() {
 #[case(String::from("parseQuery"), String::from("php"))]
 #[case(String::from("query_db"), String::from("rs"))]
 #[case(String::from("parse_query"), String::from("py"))]
+#[case(String::from("parse_query"), String::from("rb"))]
 fn search_returns_matching_function_line_for_recursive(
     #[case] query: String,
     #[case] file_type_string: String,
@@ -643,4 +653,57 @@ fn search_returns_matching_function_line_for_recursive(
     println!("actual   {:?}", actual);
     // Note that there may be more results than was expected, but we're ok with that here.
     assert!(expected.iter().all(|item| actual.contains(item)));
+}
+
+#[rstest]
+fn search_returns_matching_rb_method_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("rb").unwrap();
+    let query = String::from("parse_query");
+    let expected = vec![common::get_expected_search_result_for_file_type("rb")];
+    let file_type_string = String::from("rb");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    assert_eq!(expected, common::do_search(args));
+}
+
+#[rstest]
+fn search_returns_matching_rb_class_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("rb").unwrap();
+    let query = String::from("QueryParser");
+    let file_type_string = String::from("rb");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len());
+    assert_eq!("class QueryParser", actual[0].text);
+}
+
+#[rstest]
+fn search_returns_matching_rb_module_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("rb").unwrap();
+    let query = String::from("QueryModule");
+    let file_type_string = String::from("rb");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len());
+    assert_eq!("module QueryModule", actual[0].text);
+}
+
+#[rstest]
+fn search_returns_matching_rb_singleton_method_line() {
+    let file_path = common::get_default_fixture_for_file_type_string("rb").unwrap();
+    let query = String::from("module_method");
+    let file_type_string = String::from("rb");
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    let actual = common::do_search(args);
+    assert_eq!(1, actual.len());
+    assert_eq!("def self.module_method", actual[0].text);
+}
+
+#[rstest]
+fn search_returns_nothing_for_rb_partial_match() {
+    let file_path = common::get_default_fixture_for_file_type_string("rb").unwrap();
+    let query = String::from("parse");
+    let file_type_string = String::from("rb");
+    let expected: Vec<SearchResult> = vec![];
+    let args = common::make_args(query, Some(file_path), Some(file_type_string));
+    assert_eq!(expected, common::do_search(args));
 }

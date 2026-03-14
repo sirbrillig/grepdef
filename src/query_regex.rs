@@ -11,6 +11,7 @@ pub fn get_regex_for_query(query: &str, file_type: &FileType) -> Regex {
         ),
         FileType::RS => &format!(r"\b(?:fn|trait|enum|struct|mod) {query}\b"),
         FileType::PY => &format!(r"\b(?:(?:async\s+)?def|class)\s+{query}\b"),
+        FileType::RB => &format!(r"\b(?:def|class|module)\s+(?:self\.)?{query}\b"),
     };
     Regex::new(regexp_string).expect("Could not create regex for file type query")
 }
