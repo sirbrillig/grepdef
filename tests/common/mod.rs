@@ -62,6 +62,7 @@ pub fn get_default_fixture_for_file_type_string(file_type_string: &str) -> Resul
         "php" => Ok(String::from("./tests/fixtures/by-language/php-fixture.php")),
         "rs" => Ok(String::from("./tests/fixtures/by-language/rs-fixture.rs")),
         "py" => Ok(String::from("./tests/fixtures/by-language/py-fixture.py")),
+        "rb" => Ok(String::from("./tests/fixtures/by-language/rb-fixture.rb")),
         _ => {
             let file_type = FileType::from_string(file_type_string);
             match file_type {
@@ -90,6 +91,7 @@ pub fn get_expected_text_line_for_test_search(
         "php" => Ok((String::from("function parseQuery() {"), 6)),
         "rs" => Ok((String::from("pub fn query_db() -> bool {}"), 1)),
         "py" => Ok((String::from("def parse_query(query):"), 1)),
+        "rb" => Ok((String::from("def parse_query(query)"), 1)),
         _ => {
             let file_type = FileType::from_string(file_type_string);
             match file_type {

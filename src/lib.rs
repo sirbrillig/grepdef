@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 //! Quick search for symbol definitions in various programming languages
 //!
-//! Currently this supports Rust, JS (or TypeScript), Python, and PHP.
+//! Currently this supports Rust, JS (or TypeScript), Python, PHP, and Ruby.
 //!
 //! This can be used like "Go to definition" in an IDE, except that instead of using a language
 //! server, it just searches for the definition using text parsing. This is less accurate but often
@@ -96,7 +96,7 @@ pub struct Args {
     /// The file path(s) to search; recursively searches directories and respects .gitignore
     pub file_path: Option<Vec<String>>,
 
-    /// The file type to search (js, php, rs, ts, py); will guess if not set
+    /// The file type to search (js, php, rs, ts, py, rb); will guess if not set
     #[arg(short = 't', long = "type")]
     pub file_type: Option<String>,
 
@@ -275,6 +275,9 @@ pub enum FileType {
 
     /// The Python file type
     PY,
+
+    /// The Ruby file type
+    RB,
 }
 
 impl FileType {
@@ -299,6 +302,8 @@ impl FileType {
             "rust" => Ok(FileType::RS),
             "py" => Ok(FileType::PY),
             "python" => Ok(FileType::PY),
+            "rb" => Ok(FileType::RB),
+            "ruby" => Ok(FileType::RB),
             _ => Err(format!("Invalid file type '{}'", file_type_string)),
         }
     }
@@ -310,6 +315,7 @@ impl FileType {
             Self::PHP => String::from("php"),
             Self::RS => String::from("rs"),
             Self::PY => String::from("py"),
+            Self::RB => String::from("rb"),
         }
     }
 

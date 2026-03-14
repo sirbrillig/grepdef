@@ -15,6 +15,7 @@ pub fn path_matches_file_type(path: &str, file_type: &FileType) -> bool {
         FileType::PHP => ext == "php",
         FileType::RS => ext == "rs",
         FileType::PY => ext == "py",
+        FileType::RB => ext == "rb",
     }
 }
 
@@ -36,6 +37,7 @@ pub fn guess_file_type_from_file_path(file_path: &str) -> Option<FileType> {
             "php" => return Some(FileType::PHP),
             "rs" => return Some(FileType::RS),
             "py" => return Some(FileType::PY),
+            "rb" => return Some(FileType::RB),
             _ => continue,
         }
     }
