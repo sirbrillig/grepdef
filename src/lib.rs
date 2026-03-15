@@ -765,7 +765,8 @@ fn search_file_line_by_line(
     file: &fs::File,
     config: &Config,
 ) -> Vec<SearchResult> {
-    let lines = io::BufReader::new(file).lines();
+    // 64 KB buffer reduces syscalls by up to 8x compared to the default 8 KB.
+    let lines = io::BufReader::with_capacity(64 * 1024, file).lines();
     let mut line_counter = 0;
 
     lines
