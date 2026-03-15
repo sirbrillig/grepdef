@@ -15,6 +15,7 @@ crossbeam-channel = "0.5.15"
 exitcode = "1.1.2"
 ignore = "0.4.22"
 memchr = "2.7.4"
+memmap2 = "0.9"
 regex = "1.10.5"
 rstest = "0.21.0"
 serde = { version = "1.0.204", features = ["derive"] }
