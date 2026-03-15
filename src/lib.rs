@@ -741,31 +741,91 @@ where
     };
     let bytes: &[u8] = &mmap;
 
-    // Prescan: quickly reject files that definitely don't contain a match.
-    let prescan_pass = match config.search_method {
-        SearchMethod::PrescanMemmem => finder.find(bytes).is_some(),
-        SearchMethod::PrescanRegex => re.is_match(bytes),
-        SearchMethod::NoPrescan => true,
+    let results = match config.search_method {
+        // Single-pass: memmem jumps to each occurrence of the symbol name and the regex
+        // is checked only on that line — no separate prescan step, no second pass.
+        SearchMethod::PrescanMemmem => search_file_single_pass(re, file_path, bytes, config, finder),
+        SearchMethod::PrescanRegex => {
+            if !re.is_match(bytes) {
+                debug(config, format!("Presearch of {} found no match; skipping", &file_path).as_str());
+                vec![]
+            } else {
+                debug(config, format!("Presearch of {} was successful; searching for line", &file_path).as_str());
+                search_file_line_by_line(re, file_path, bytes, config)
+            }
+        }
+        SearchMethod::NoPrescan => search_file_line_by_line(re, file_path, bytes, config),
     };
 
-    if !prescan_pass {
-        debug(
-            config,
-            format!("Presearch of {} found no match; skipping", &file_path).as_str(),
-        );
-        callback(vec![]);
-        return;
+    callback(results);
+}
+
+fn search_file_single_pass(
+    re: &Regex,
+    file_path: &str,
+    bytes: &[u8],
+    config: &Config,
+    finder: &memmem::Finder<'_>,
+) -> Vec<SearchResult> {
+    let mut results = vec![];
+    let mut pos: usize = 0;
+    let mut line_number: usize = 1;
+
+    while pos < bytes.len() {
+        // Jump to the next occurrence of the symbol name.
+        let rel_offset = match finder.find(&bytes[pos..]) {
+            Some(o) => o,
+            None => break,
+        };
+        let match_pos = pos + rel_offset;
+
+        // Count newlines between pos and the match to track which line we're on.
+        let skipped_lines = bytes[pos..match_pos].iter().filter(|&&b| b == b'\n').count();
+        line_number += skipped_lines;
+
+        // Find the start of the line containing this match (scan back to the previous \n).
+        let line_start = bytes[pos..match_pos]
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map(|i| pos + i + 1)
+            .unwrap_or(pos);
+
+        // Find the end of the line (scan forward to the next \n).
+        let line_end = bytes[match_pos..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map(|i| match_pos + i)
+            .unwrap_or(bytes.len());
+
+        let line_bytes = &bytes[line_start..line_end];
+
+        if re.is_match(line_bytes) {
+            if let Ok(line) = std::str::from_utf8(line_bytes) {
+                results.push(SearchResult {
+                    event_type: match config.format {
+                        SearchResultFormat::JsonList => SearchEventType::MATCH,
+                        _ => SearchEventType::NONE,
+                    },
+                    file_path: String::from(file_path),
+                    line_number: if config.line_number {
+                        Some(line_number)
+                    } else {
+                        None
+                    },
+                    text: line.trim().into(),
+                });
+            }
+        }
+
+        // Advance past this entire line so we don't re-examine it.
+        if line_end >= bytes.len() {
+            break;
+        }
+        pos = line_end + 1;
+        line_number += 1;
     }
 
-    debug(
-        config,
-        format!(
-            "Presearch of {} was successful; searching for line",
-            &file_path
-        )
-        .as_str(),
-    );
-    callback(search_file_line_by_line(re, file_path, bytes, config));
+    results
 }
 
 fn search_file_line_by_line(
