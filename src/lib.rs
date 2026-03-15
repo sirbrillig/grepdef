@@ -167,10 +167,10 @@ impl Args {
 #[derive(clap::ValueEnum, Clone, Default, Debug, EnumString, PartialEq, Display)]
 pub enum SearchMethod {
     /// Pre-scan each file by reading fully into memory and using a Regex
-    #[default]
     PrescanRegex,
 
     /// Pre-scan each file by reading bytes until the query is found using memmem
+    #[default]
     PrescanMemmem,
 
     /// Don't pre-scan files.
