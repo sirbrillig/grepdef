@@ -50,13 +50,14 @@
 
 use clap::Parser;
 use colored::Colorize;
-use ignore::Walk;
+use ignore::{WalkBuilder, WalkState};
 use regex::Regex;
 use serde::Serialize;
 use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, Seek};
 use std::num::NonZero;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time;
 use strum_macros::Display;
@@ -64,7 +65,6 @@ use strum_macros::EnumString;
 
 mod file_type;
 mod query_regex;
-mod threads;
 
 /// The command-line arguments to be used by [Searcher]
 ///
@@ -575,7 +575,6 @@ impl Searcher {
         };
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let config = Arc::new(self.config.clone());
-        let mut pool = threads::ThreadPool::new(config.num_threads, config.debug);
 
         match config.color {
             ColorOption::ALWAYS => colored::control::set_override(true),
@@ -587,53 +586,69 @@ impl Searcher {
         }
 
         self.debug("Starting searchers");
-        let mut searched_file_count = 0;
+        let should_quit = Arc::new(AtomicBool::new(false));
+        let searched_file_count = Arc::new(AtomicUsize::new(0));
 
-        // Create a scope for tx to live in because it is cloned by all files and we need all
-        // senders to go out of scope for the iterator to end.
+        // Spawn a thread to run the parallel walk. When it finishes (or all tx clones are
+        // dropped), the rx iterator will end naturally.
         let rx = {
             let (tx, rx) = mpsc::channel();
-            for file_path in &config.file_paths {
-                for entry in Walk::new(file_path) {
-                    let path = match entry {
-                        Ok(path) => path.into_path(),
-                        Err(err) => {
-                            return Err(Box::new(err));
-                        }
-                    };
-                    if path.is_dir() {
-                        continue;
-                    }
-                    let path = match path.to_str() {
-                        Some(p) => p.to_string(),
-                        None => {
-                            return Err(Box::from("Error getting string from path"));
-                        }
-                    };
-                    if !file_type::path_matches_file_type(&path, &config.file_type) {
-                        continue;
-                    }
-                    searched_file_count += 1;
+            let should_quit_walk = Arc::clone(&should_quit);
+            let searched_file_count_walk = Arc::clone(&searched_file_count);
+            let config_walk = Arc::clone(&config);
+            let re_walk = re.clone();
 
-                    let re1 = re.clone();
-                    let path1 = path.clone();
-                    let config1 = Arc::clone(&config);
-                    let tx1 = tx.clone();
-                    pool.execute(move || {
-                        search_file(
-                            &re1,
-                            &path1,
-                            &config1,
-                            move |file_results: Vec<SearchResult>| {
-                                // NOTE: it would be nice to have better error handling for if this
-                                // message send fails, but since normal error handling would happen through
-                                // message sending, I don't know what else to do.
-                                let _ = tx1.send(file_results);
-                            },
-                        );
-                    })
+            std::thread::spawn(move || {
+                if config_walk.file_paths.is_empty() {
+                    return;
                 }
-            }
+                // WalkBuilder::new() requires an initial path, so seed it with
+                // the first and add the rest.
+                let mut builder = WalkBuilder::new(&config_walk.file_paths[0]);
+                for fp in config_walk.file_paths.iter().skip(1) {
+                    builder.add(fp);
+                }
+                builder.threads(config_walk.num_threads.get());
+
+                // run() uses a two-level closure: the outer closure is called once
+                // per walk thread to set up per-thread state (cloning shared values),
+                // and the returned Box<dyn FnMut> is the visitor called for each entry
+                // on that thread.
+                builder.build_parallel().run(|| {
+                    let tx = tx.clone();
+                    let re = re_walk.clone();
+                    let config = Arc::clone(&config_walk);
+                    let should_quit = Arc::clone(&should_quit_walk);
+                    let searched_file_count = Arc::clone(&searched_file_count_walk);
+
+                    Box::new(move |entry| {
+                        if should_quit.load(Ordering::Relaxed) {
+                            return WalkState::Quit;
+                        }
+                        let entry = match entry {
+                            Ok(e) => e,
+                            Err(_) => return WalkState::Continue,
+                        };
+                        if entry.path().is_dir() {
+                            return WalkState::Continue;
+                        }
+                        let path_str = match entry.path().to_str() {
+                            Some(p) => p.to_string(),
+                            None => return WalkState::Continue,
+                        };
+                        if !file_type::path_matches_file_type(&path_str, &config.file_type) {
+                            return WalkState::Continue;
+                        }
+                        searched_file_count.fetch_add(1, Ordering::Relaxed);
+                        let tx_file = tx.clone();
+                        search_file(&re, &path_str, &config, move |results| {
+                            let _ = tx_file.send(results);
+                        });
+                        WalkState::Continue
+                    })
+                });
+            });
+
             rx
         };
 
@@ -644,32 +659,28 @@ impl Searcher {
                 result_counter += 1;
                 callback(received_result);
                 // Don't try to even calculate elapsed time if we are not going to print it
-                if let (true, Some(start)) = (self.config.debug, start) {
+                if let (true, Some(start)) = (config.debug, start) {
                     self.debug(
                         format!("Found a result in {} ms", start.elapsed().as_millis()).as_str(),
                     );
                 }
-                if let Some(i) = self.config.limit {
+                if let Some(i) = config.limit {
                     self.debug(format!("This is result {}; limit {}", result_counter, i).as_str());
                     if result_counter >= i {
                         self.debug("Limit reached");
-                        pool.stop();
+                        should_quit.store(true, Ordering::Relaxed);
                         break 'all_results;
                     }
                 }
             }
         }
 
-        self.debug("Waiting for searchers to complete");
-        pool.wait_for_all_jobs_and_stop();
-        self.debug("Searchers complete");
-
         // Don't try to even calculate elapsed time if we are not going to print it
-        if let (true, Some(start)) = (self.config.debug, start) {
+        if let (true, Some(start)) = (config.debug, start) {
             self.debug(
                 format!(
                     "Scanned {} files in {} ms",
-                    searched_file_count,
+                    searched_file_count.load(Ordering::Relaxed),
                     start.elapsed().as_millis()
                 )
                 .as_str(),
