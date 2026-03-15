@@ -57,18 +57,20 @@ pub fn does_file_match_query(mut file: &fs::File, query: &str) -> bool {
     let mut full: Vec<u8> = vec![];
     let mut buf = [0u8; 2048];
     let finder = memmem::Finder::new(query);
+    // Keep query.len()-1 bytes of overlap between chunks so matches that
+    // span a chunk boundary are not missed.
+    let overlap = query.len().saturating_sub(1);
     loop {
-        let bytes = file.read(&mut buf);
-        if bytes.unwrap_or(0) == 0 {
+        let n = file.read(&mut buf).unwrap_or(0);
+        if n == 0 {
             break false;
         }
-        if full.contains(&0xA) {
-            let mut split_full = full.rsplit(|&b| b == b'\n');
-            full = split_full.next().unwrap_or(&[0u8, 1]).to_vec();
-        }
-        full.extend(buf);
+        full.extend_from_slice(&buf[..n]);
         if finder.find(&full).is_some() {
             break true;
+        }
+        if full.len() > overlap {
+            full.drain(..full.len() - overlap);
         }
     }
 }
