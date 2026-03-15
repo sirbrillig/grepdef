@@ -53,13 +53,12 @@ pub fn does_file_match_regexp(mut file: &fs::File, re: &Regex) -> bool {
     re.is_match(&buf)
 }
 
-pub fn does_file_match_query(mut file: &fs::File, query: &str) -> bool {
+pub fn does_file_match_query(mut file: &fs::File, finder: &memmem::Finder<'_>) -> bool {
     let mut full: Vec<u8> = vec![];
     let mut buf = [0u8; 2048];
-    let finder = memmem::Finder::new(query);
-    // Keep query.len()-1 bytes of overlap between chunks so matches that
+    // Keep needle.len()-1 bytes of overlap between chunks so matches that
     // span a chunk boundary are not missed.
-    let overlap = query.len().saturating_sub(1);
+    let overlap = finder.needle().len().saturating_sub(1);
     loop {
         let n = file.read(&mut buf).unwrap_or(0);
         if n == 0 {

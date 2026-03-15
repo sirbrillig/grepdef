@@ -51,6 +51,7 @@
 use clap::Parser;
 use colored::Colorize;
 use ignore::{WalkBuilder, WalkState};
+use memchr::memmem;
 use regex::Regex;
 use serde::Serialize;
 use std::error::Error;
@@ -620,6 +621,8 @@ impl Searcher {
                     let config = Arc::clone(&config_walk);
                     let should_quit = Arc::clone(&should_quit_walk);
                     let searched_file_count = Arc::clone(&searched_file_count_walk);
+                    // Build the memmem Finder once per thread rather than once per file.
+                    let finder = memmem::Finder::new(config.query.as_bytes()).into_owned();
 
                     Box::new(move |entry| {
                         if should_quit.load(Ordering::Relaxed) {
@@ -641,7 +644,7 @@ impl Searcher {
                         }
                         searched_file_count.fetch_add(1, Ordering::Relaxed);
                         let tx_file = tx.clone();
-                        search_file(&re, &path_str, &config, move |results| {
+                        search_file(&re, &path_str, &config, &finder, move |results| {
                             let _ = tx_file.send(results);
                         });
                         WalkState::Continue
@@ -712,7 +715,7 @@ fn debug(config: &Config, output: &str) {
     }
 }
 
-fn search_file<F>(re: &Regex, file_path: &str, config: &Config, callback: F)
+fn search_file<F>(re: &Regex, file_path: &str, config: &Config, finder: &memmem::Finder<'_>, callback: F)
 where
     F: FnOnce(Vec<SearchResult>) + Send + 'static,
 {
@@ -726,7 +729,7 @@ where
             if match config.search_method {
                 SearchMethod::PrescanRegex => !file_type::does_file_match_regexp(&file, re),
                 SearchMethod::PrescanMemmem => {
-                    !file_type::does_file_match_query(&file, &config.query)
+                    !file_type::does_file_match_query(&file, finder)
                 }
                 SearchMethod::NoPrescan => false,
             } {
