@@ -53,7 +53,7 @@ use colored::Colorize;
 use ignore::{WalkBuilder, WalkState};
 use memchr::memmem;
 use memmap2::MmapOptions;
-use regex::Regex;
+use regex::bytes::Regex;
 use serde::Serialize;
 use std::error::Error;
 use std::fs;
@@ -744,9 +744,7 @@ where
     // Prescan: quickly reject files that definitely don't contain a match.
     let prescan_pass = match config.search_method {
         SearchMethod::PrescanMemmem => finder.find(bytes).is_some(),
-        SearchMethod::PrescanRegex => {
-            std::str::from_utf8(bytes).map_or(false, |s| re.is_match(s))
-        }
+        SearchMethod::PrescanRegex => re.is_match(bytes),
         SearchMethod::NoPrescan => true,
     };
 
@@ -782,11 +780,12 @@ fn search_file_line_by_line(
         .split(|&b| b == b'\n')
         .filter_map(|line_bytes| {
             line_counter += 1;
-            // Skip lines that aren't valid UTF-8 (e.g. binary content).
-            let line = std::str::from_utf8(line_bytes).ok()?;
-            if !re.is_match(line) {
+            if !re.is_match(line_bytes) {
                 return None;
             }
+            // Only validate UTF-8 for lines that matched — since matches are rare,
+            // this avoids validating the entire file byte-by-byte.
+            let line = std::str::from_utf8(line_bytes).ok()?;
             Some(SearchResult {
                 event_type: match config.format {
                     SearchResultFormat::JsonList => SearchEventType::MATCH,
