@@ -52,11 +52,11 @@ use clap::Parser;
 use colored::Colorize;
 use ignore::{WalkBuilder, WalkState};
 use memchr::memmem;
-use regex::Regex;
+use memmap2::MmapOptions;
+use regex::bytes::Regex;
 use serde::Serialize;
 use std::error::Error;
 use std::fs;
-use std::io::{self, BufRead, Seek};
 use std::num::NonZero;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
@@ -167,10 +167,10 @@ impl Args {
 #[derive(clap::ValueEnum, Clone, Default, Debug, EnumString, PartialEq, Display)]
 pub enum SearchMethod {
     /// Pre-scan each file by reading fully into memory and using a Regex
-    #[default]
     PrescanRegex,
 
     /// Pre-scan each file by reading bytes until the query is found using memmem
+    #[default]
     PrescanMemmem,
 
     /// Don't pre-scan files.
@@ -720,75 +720,72 @@ where
     F: FnOnce(Vec<SearchResult>) + Send + 'static,
 {
     debug(config, format!("Scanning file {}", file_path).as_str());
-    let file = fs::File::open(file_path);
-
-    match file {
-        Ok(mut file) => {
-            // Scan the file in big chunks to see if it has what we are looking for. This is more efficient
-            // than going line-by-line on every file since matches should be quite rare.
-            if match config.search_method {
-                SearchMethod::PrescanRegex => !file_type::does_file_match_regexp(&file, re),
-                SearchMethod::PrescanMemmem => {
-                    !file_type::does_file_match_query(&file, finder)
-                }
-                SearchMethod::NoPrescan => false,
-            } {
-                debug(
-                    config,
-                    format!("Presearch of {} found no match; skipping", &file_path).as_str(),
-                );
-                callback(vec![]);
-                return;
-            }
-
-            let rewind_result = file.rewind();
-            if rewind_result.is_err() {
-                callback(vec![]);
-                return;
-            }
-            debug(
-                config,
-                format!(
-                    "Presearch of {} was successful; searching for line",
-                    &file_path
-                )
-                .as_str(),
-            );
-            callback(search_file_line_by_line(re, file_path, &file, config));
-        }
+    let file = match fs::File::open(file_path) {
+        Ok(f) => f,
         Err(_) => {
             callback(vec![]);
+            return;
         }
+    };
+
+    // Memory-map the file so the OS page cache is used directly — no explicit read() calls,
+    // no intermediate buffer allocation, and no rewind needed between prescan and line search.
+    // SAFETY: we only read from the mapping and never modify the file during the search.
+    let mmap = match unsafe { MmapOptions::new().map(&file) } {
+        Ok(m) => m,
+        // mmap fails on empty files and in rare resource-exhaustion cases; just skip.
+        Err(_) => {
+            callback(vec![]);
+            return;
+        }
+    };
+    let bytes: &[u8] = &mmap;
+
+    // Prescan: quickly reject files that definitely don't contain a match.
+    let prescan_pass = match config.search_method {
+        SearchMethod::PrescanMemmem => finder.find(bytes).is_some(),
+        SearchMethod::PrescanRegex => re.is_match(bytes),
+        SearchMethod::NoPrescan => true,
+    };
+
+    if !prescan_pass {
+        debug(
+            config,
+            format!("Presearch of {} found no match; skipping", &file_path).as_str(),
+        );
+        callback(vec![]);
+        return;
     }
+
+    debug(
+        config,
+        format!(
+            "Presearch of {} was successful; searching for line",
+            &file_path
+        )
+        .as_str(),
+    );
+    callback(search_file_line_by_line(re, file_path, bytes, config));
 }
 
 fn search_file_line_by_line(
     re: &Regex,
     file_path: &str,
-    file: &fs::File,
+    bytes: &[u8],
     config: &Config,
 ) -> Vec<SearchResult> {
-    // 64 KB buffer reduces syscalls by up to 8x compared to the default 8 KB.
-    let lines = io::BufReader::with_capacity(64 * 1024, file).lines();
     let mut line_counter = 0;
 
-    lines
-        .filter_map(|line| {
+    bytes
+        .split(|&b| b == b'\n')
+        .filter_map(|line_bytes| {
             line_counter += 1;
-            if !match &line {
-                Ok(line) => re.is_match(line),
-                Err(_) => false,
-            } {
+            if !re.is_match(line_bytes) {
                 return None;
             }
-
-            let text = match line {
-                Ok(line) => line,
-                // If reading the line causes an error (eg: invalid UTF), then skip it by treating
-                // it as empty.
-                Err(_err) => String::from(""),
-            };
-
+            // Only validate UTF-8 for lines that matched — since matches are rare,
+            // this avoids validating the entire file byte-by-byte.
+            let line = std::str::from_utf8(line_bytes).ok()?;
             Some(SearchResult {
                 event_type: match config.format {
                     SearchResultFormat::JsonList => SearchEventType::MATCH,
@@ -800,7 +797,7 @@ fn search_file_line_by_line(
                 } else {
                     None
                 },
-                text: text.trim().into(),
+                text: line.trim().into(),
             })
         })
         .collect()

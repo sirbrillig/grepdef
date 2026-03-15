@@ -1,5 +1,5 @@
 use super::FileType;
-use regex::Regex;
+use regex::bytes::Regex;
 
 pub fn get_regex_for_query(query: &str, file_type: &FileType) -> Regex {
     let regexp_string = match file_type {

@@ -1,9 +1,5 @@
 use super::FileType;
 use ignore::Walk;
-use memchr::memmem;
-use regex::Regex;
-use std::fs;
-use std::io::Read;
 
 pub fn path_matches_file_type(path: &str, file_type: &FileType) -> bool {
     let ext = std::path::Path::new(path)
@@ -42,34 +38,4 @@ pub fn guess_file_type_from_file_path(file_path: &str) -> Option<FileType> {
         }
     }
     None
-}
-
-pub fn does_file_match_regexp(mut file: &fs::File, re: &Regex) -> bool {
-    let mut buf = String::new();
-    let bytes = file.read_to_string(&mut buf);
-    if bytes.unwrap_or(0) == 0 {
-        return false;
-    }
-    re.is_match(&buf)
-}
-
-pub fn does_file_match_query(mut file: &fs::File, finder: &memmem::Finder<'_>) -> bool {
-    let mut full: Vec<u8> = vec![];
-    let mut buf = [0u8; 2048];
-    // Keep needle.len()-1 bytes of overlap between chunks so matches that
-    // span a chunk boundary are not missed.
-    let overlap = finder.needle().len().saturating_sub(1);
-    loop {
-        let n = file.read(&mut buf).unwrap_or(0);
-        if n == 0 {
-            break false;
-        }
-        full.extend_from_slice(&buf[..n]);
-        if finder.find(&full).is_some() {
-            break true;
-        }
-        if full.len() > overlap {
-            full.drain(..full.len() - overlap);
-        }
-    }
 }
