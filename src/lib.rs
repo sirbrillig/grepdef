@@ -836,8 +836,13 @@ fn debug(config: &Config, output: &str) {
     }
 }
 
-fn search_file<F>(re: &Regex, file_path: &str, config: &Config, finder: &memmem::Finder<'_>, callback: F)
-where
+fn search_file<F>(
+    re: &Regex,
+    file_path: &str,
+    config: &Config,
+    finder: &memmem::Finder<'_>,
+    callback: F,
+) where
     F: FnOnce(Vec<SearchResult>) + Send + 'static,
 {
     debug(config, format!("Scanning file {}", file_path).as_str());
