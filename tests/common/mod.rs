@@ -20,6 +20,8 @@ pub fn make_args(
         color: None,
         threads: None,
         format: None,
+        index: false,
+        index_dir: None,
     }
 }
 

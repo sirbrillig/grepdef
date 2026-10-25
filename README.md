@@ -35,6 +35,10 @@ Include the line numbers of matches (equivalent to the grep or rg option).
 
 Disable colors in output (color is always disabled if not printing to STDOUT).
 
+--index
+
+(Experimental) Keep an index of which files define which symbols, stored in your user cache directory, and use it to skip reading files that have not changed and do not define the symbol. The first search with this option builds the index, which takes a little longer than a normal search. Results are always the same as without the index; files that are new or changed since the index was built are always searched.
+
 -h, --help
 
 Print help and usage text.
