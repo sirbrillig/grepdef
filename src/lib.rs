@@ -69,6 +69,8 @@ mod file_type;
 mod index;
 mod query_regex;
 
+pub use index::remove_all_indexes;
+
 /// The command-line arguments to be used by [Searcher]
 ///
 /// Can be passed to [Searcher::new].
@@ -94,6 +96,7 @@ mod query_regex;
 )]
 pub struct Args {
     /// (Required) The symbol name (function, class, etc.) to search for
+    #[arg(required_unless_present = "clear_indexes", default_value = "")]
     pub query: String,
 
     /// The file path(s) to search; recursively searches directories and respects .gitignore
@@ -149,6 +152,12 @@ pub struct Args {
     /// (Advanced) The directory in which to store indexes; defaults to the user cache directory
     #[arg(long = "index-dir", hide = true)]
     pub index_dir: Option<String>,
+
+    /// Remove all indexes so that each is rebuilt by the next search that uses it
+    ///
+    /// The query is optional with this option; if one is provided, it is searched for afterward.
+    #[arg(long = "clear-indexes")]
+    pub clear_indexes: bool,
 
     /// (Internal) Refresh the index instead of searching; used by the background refresh process
     #[arg(long = "background-index-refresh", hide = true)]

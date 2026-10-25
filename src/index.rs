@@ -381,10 +381,7 @@ fn is_refresh_running(dest: &Path) -> bool {
 /// Paths in the index are stored exactly as the walk produces them, which depends on the working
 /// directory and on how the search paths were written, so all of those are part of the key.
 fn get_index_path(config: &Config) -> Option<PathBuf> {
-    let dir = match &config.index_dir {
-        Some(dir) => PathBuf::from(dir),
-        None => get_default_index_dir()?,
-    };
+    let dir = get_index_dir(config.index_dir.as_deref())?;
     let cwd = std::env::current_dir().ok()?.canonicalize().ok()?;
     let mut key = Vec::from(HEADER);
     key.extend_from_slice(cwd.to_string_lossy().as_bytes());
@@ -395,6 +392,63 @@ fn get_index_path(config: &Config) -> Option<PathBuf> {
     key.push(0);
     key.extend_from_slice(config.file_type.to_string().as_bytes());
     Some(dir.join(format!("{:016x}.idx", fnv1a(&key))))
+}
+
+fn get_index_dir(index_dir: Option<&str>) -> Option<PathBuf> {
+    match index_dir {
+        Some(dir) => Some(PathBuf::from(dir)),
+        None => get_default_index_dir(),
+    }
+}
+
+/// Remove every index so that each is rebuilt by the next search that uses it
+///
+/// Pass the same `index_dir` as [crate::Args::index_dir], or None for the default directory.
+/// Returns the directory and the number of indexes removed.
+///
+/// This also stops any refresh that is in progress, since it will no longer find its claim in the
+/// owner file; otherwise it could write back an index built from the old one.
+pub fn remove_all_indexes(index_dir: Option<&str>) -> io::Result<(PathBuf, usize)> {
+    let dir = get_index_dir(index_dir)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no index directory"))?;
+    let entries = match fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok((dir, 0)),
+        Err(err) => return Err(err),
+    };
+    let mut removed_count = 0;
+    for entry in entries {
+        let path = entry?.path();
+        let Some(kind) = path
+            .file_name()
+            .and_then(|name| get_index_file_kind(name.to_str()?))
+        else {
+            continue;
+        };
+        fs::remove_file(&path)?;
+        if kind == "idx" {
+            removed_count += 1;
+        }
+    }
+    Ok((dir, removed_count))
+}
+
+/// Return the kind (`idx`, `owner`, or `tmp`) of a file name created by this module, if it is one
+///
+/// The index directory could be shared with other files, so only files with these exact names are
+/// ever removed: `<hash>.idx`, `<hash>.owner`, or `<hash>.<pid>.tmp`.
+fn get_index_file_kind(name: &str) -> Option<&str> {
+    let (hash, rest) = name.split_once('.')?;
+    if hash.len() != 16 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    match rest.split_once('.') {
+        None if rest == "idx" || rest == "owner" => Some(rest),
+        Some((pid, "tmp")) if !pid.is_empty() && pid.bytes().all(|b| b.is_ascii_digit()) => {
+            Some("tmp")
+        }
+        _ => None,
+    }
 }
 
 fn get_default_index_dir() -> Option<PathBuf> {
@@ -909,6 +963,38 @@ mod tests {
 
         fs::remove_dir_all(&dir).unwrap();
         fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[test]
+    fn remove_all_indexes_removes_only_index_files_and_stops_refreshes() {
+        let index_dir = make_temp_dir("remove-cache");
+        let dest = index_dir.join("0123456789abcdef.idx");
+        fs::write(&dest, HEADER).unwrap();
+        fs::write(index_dir.join("fedcba9876543210.idx"), HEADER).unwrap();
+        fs::write(index_dir.join("0123456789abcdef.123.tmp"), "").unwrap();
+        fs::write(index_dir.join("notes.txt"), "").unwrap();
+        fs::write(index_dir.join("0123456789abcdef.txt"), "").unwrap();
+        let owner = Owner::claim(&dest).unwrap();
+
+        let (dir, removed_count) = remove_all_indexes(Some(index_dir.to_str().unwrap())).unwrap();
+        assert_eq!(index_dir, dir);
+        assert_eq!(2, removed_count);
+        let mut remaining: Vec<String> = fs::read_dir(&index_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into())
+            .collect();
+        remaining.sort();
+        assert_eq!(vec!["0123456789abcdef.txt", "notes.txt"], remaining);
+        assert!(!owner.check_in());
+
+        fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[test]
+    fn remove_all_indexes_succeeds_if_there_is_no_index_dir() {
+        let index_dir = std::env::temp_dir().join("grepdef-index-dir-that-does-not-exist");
+        let (_, removed_count) = remove_all_indexes(Some(index_dir.to_str().unwrap())).unwrap();
+        assert_eq!(0, removed_count);
     }
 
     #[test]

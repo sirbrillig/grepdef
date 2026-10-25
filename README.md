@@ -41,6 +41,10 @@ Disable colors in output (color is always disabled if not printing to STDOUT).
 
 This can also be enabled by setting the `GREPDEF_INDEX` environment variable (eg: `GREPDEF_INDEX=1`), which is useful for editor integrations.
 
+--clear-indexes
+
+Remove all indexes so that each is rebuilt by the next search that uses it. Use this if an index ever seems to be wrong. The query is optional with this option; if one is provided, it is searched for afterward.
+
 -h, --help
 
 Print help and usage text.
