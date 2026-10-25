@@ -41,6 +41,13 @@ const HEADER: &[u8] = b"grepdef-index 1\n";
 /// they will always be searched directly. Two seconds covers the coarsest common filesystem (FAT).
 const RACY_WINDOW_NANOS: i128 = 2_000_000_000;
 
+/// A search does not start a refresh if the index was written less than this long ago
+///
+/// Without this, a project where files are always changing (eg: with many people working in it)
+/// could start a refresh after nearly every search. Changed files are searched directly until they
+/// are indexed, so a later refresh only costs a little search time.
+const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+
 /// A refresh checks in with its owner file after visiting this many entries
 const CHECK_IN_INTERVAL: usize = 256;
 
@@ -104,8 +111,12 @@ fn is_indexable(path: &str, entry: &DirEntry) -> bool {
 
 /// An index loaded for a single query
 pub struct Index {
-    /// Every indexed file, by path, with its id and the stamp it had when indexed
-    files: HashMap<String, (u32, FileStamp)>,
+    /// Every indexed file, by path, with its id, the stamp it had when indexed, and whether it is
+    /// pending (see [StoredFile::pending])
+    files: HashMap<String, (u32, FileStamp, bool)>,
+
+    /// When the index was loaded, in nanoseconds since the epoch
+    loaded_nanos: i128,
 
     /// The ids of the files which the index lists as defining the query
     candidates: HashSet<u32>,
@@ -113,7 +124,7 @@ pub struct Index {
     /// True if the search found a file that is new or has changed since the index was built
     found_changed_file: AtomicBool,
 
-    /// The number of indexed files that the search found unchanged
+    /// The number of indexed files that the search found unchanged (or pending)
     unchanged_file_count: AtomicUsize,
 }
 
@@ -123,19 +134,32 @@ impl Index {
         if !is_indexable(path, entry) {
             return true;
         }
-        let Some((id, stamp)) = self.files.get(path) else {
+        let Some(&(id, stamp, pending)) = self.files.get(path) else {
             self.found_changed_file.store(true, Ordering::Relaxed);
             return true;
         };
-        match entry.metadata() {
-            Ok(metadata) if FileStamp::from_metadata(&metadata) == *stamp => {
-                self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
-                self.candidates.contains(id)
-            }
-            _ => {
+        let current_stamp = entry
+            .metadata()
+            .ok()
+            .map(|metadata| FileStamp::from_metadata(&metadata));
+        if pending {
+            // A pending file is always searched, but it only makes the index out of date once it
+            // has stopped changing and so can be indexed; otherwise a file that keeps changing
+            // (eg: from a build in watch mode) would start a refresh after every search.
+            self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
+            if current_stamp.is_none_or(|current_stamp| {
+                current_stamp.newest_nanos() < self.loaded_nanos - RACY_WINDOW_NANOS
+            }) {
                 self.found_changed_file.store(true, Ordering::Relaxed);
-                true
             }
+            return true;
+        }
+        if current_stamp == Some(stamp) {
+            self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
+            self.candidates.contains(&id)
+        } else {
+            self.found_changed_file.store(true, Ordering::Relaxed);
+            true
         }
     }
 
@@ -207,6 +231,13 @@ pub fn refresh_if_needed(config: &Config, index: Option<&Index>, walked_all_file
         debug(
             config,
             "Index is out of date but is already being refreshed",
+        );
+        return;
+    }
+    if was_refreshed_recently(&dest) {
+        debug(
+            config,
+            "Index is out of date but was refreshed recently; changed files are searched directly",
         );
         return;
     }
@@ -435,6 +466,17 @@ fn is_refresh_running(dest: &Path) -> bool {
         })
 }
 
+/// Return true if an index was written less than [MIN_REFRESH_INTERVAL] ago
+fn was_refreshed_recently(dest: &Path) -> bool {
+    fs::metadata(dest)
+        .and_then(|metadata| metadata.modified())
+        .is_ok_and(|modified| {
+            modified
+                .elapsed()
+                .map_or(true, |elapsed| elapsed < MIN_REFRESH_INTERVAL)
+        })
+}
+
 /// The index file for a search
 ///
 /// Paths in the index are stored exactly as the walk produces them, which depends on the working
@@ -544,6 +586,7 @@ fn invalid_data(message: &str) -> io::Error {
 /// F <size> <mtime secs> <mtime nsecs> <ctime secs> <ctime nsecs> <path>
 /// ```
 ///
+/// or, for a pending file (see [StoredFile::pending]), the same but starting with `P`;
 /// where the line number (starting at 0) is the file id, then one line per symbol:
 ///
 /// ```text
@@ -560,7 +603,7 @@ fn parse_files(data: &[u8]) -> io::Result<(Vec<StoredFile>, &[u8])> {
     while pos < data.len() {
         let end = memchr(b'\n', &data[pos..]).map_or(data.len(), |i| pos + i);
         let line = &data[pos..end];
-        if !line.starts_with(b"F ") {
+        if !line.starts_with(b"F ") && !line.starts_with(b"P ") {
             break;
         }
         files.push(parse_file_line(line).ok_or_else(|| invalid_data("bad file"))?);
@@ -569,8 +612,9 @@ fn parse_files(data: &[u8]) -> io::Result<(Vec<StoredFile>, &[u8])> {
     Ok((files, &data[(pos - 1).min(data.len())..]))
 }
 
-fn parse_file_line(line: &[u8]) -> Option<(String, FileStamp)> {
+fn parse_file_line(line: &[u8]) -> Option<StoredFile> {
     let line = std::str::from_utf8(line).ok()?;
+    let pending = line.starts_with('P');
     let mut fields = line.splitn(7, ' ').skip(1);
     let mut next_number = || fields.next()?.parse::<i64>().ok();
     let stamp = FileStamp {
@@ -578,7 +622,11 @@ fn parse_file_line(line: &[u8]) -> Option<(String, FileStamp)> {
         mtime: (next_number()?, next_number()?),
         ctime: (next_number()?, next_number()?),
     };
-    Some((fields.next()?.to_string(), stamp))
+    Some(StoredFile {
+        path: fields.next()?.to_string(),
+        stamp,
+        pending,
+    })
 }
 
 fn parse_file_ids(ids: &[u8]) -> io::Result<Vec<u32>> {
@@ -607,16 +655,32 @@ fn load(path: &Path, query: &str) -> io::Result<Index> {
         files: files
             .into_iter()
             .enumerate()
-            .map(|(id, (path, stamp))| (path, (id as u32, stamp)))
+            .map(|(id, file)| (file.path, (id as u32, file.stamp, file.pending)))
             .collect(),
+        loaded_nanos: now_nanos(),
         candidates,
         found_changed_file: AtomicBool::new(false),
         unchanged_file_count: AtomicUsize::new(0),
     })
 }
 
-/// A file's path and stamp as stored in an index
-type StoredFile = (String, FileStamp);
+fn now_nanos() -> i128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos() as i128)
+}
+
+/// A file as stored in an index
+struct StoredFile {
+    path: String,
+    stamp: FileStamp,
+
+    /// True if the file changed too recently to be indexed
+    ///
+    /// A pending file has no symbols, so it is always searched; it is stored so that a search can
+    /// tell when it has stopped changing (see [Index::should_search]).
+    pending: bool,
+}
 
 /// The full contents of an index file, used to refresh it
 #[derive(Default)]
@@ -664,7 +728,7 @@ enum FileSymbols {
     /// The file is new or changed and these are its symbols
     Found(HashSet<String>),
 
-    /// The file changed too recently to be indexed
+    /// The file changed too recently to be indexed, so it will be stored as pending
     TooRecent,
 }
 
@@ -681,15 +745,13 @@ struct RefreshCounts {
 /// Files which are unchanged in the existing index (if there is one) keep their symbols; the rest
 /// are read. Files which no longer exist are dropped.
 fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCounts> {
-    let start_nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos() as i128);
+    let start_nanos = now_nanos();
     let old = load_stored(dest).unwrap_or_default();
     let old_ids: HashMap<&str, u32> = old
         .files
         .iter()
         .enumerate()
-        .map(|(id, (path, _))| (path.as_str(), id as u32))
+        .map(|(id, file)| (file.path.as_str(), id as u32))
         .collect();
     let extractors = query_regex::get_symbol_extractors(&config.file_type);
     let builder =
@@ -728,7 +790,8 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
                 Err(_) => return WalkState::Continue,
             };
             if let Some(&old_id) = old_ids.get(path) {
-                if old.files[old_id as usize].1 == stamp {
+                let old_file = &old.files[old_id as usize];
+                if !old_file.pending && old_file.stamp == stamp {
                     let _ = tx.send((path.to_string(), stamp, FileSymbols::Unchanged(old_id)));
                     return WalkState::Continue;
                 }
@@ -737,11 +800,18 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
                 let _ = tx.send((path.to_string(), stamp, FileSymbols::TooRecent));
                 return WalkState::Continue;
             }
-            let bytes = match fs::read(entry.path()) {
-                Ok(bytes) => bytes,
+            let symbols = match fs::read(entry.path()) {
+                Ok(bytes) => FileSymbols::Found(extract_symbols(&bytes, extractors)),
+                // A search cannot read the file either, so it defines nothing a search could
+                // find. Leaving it out would make every search think the index is out of date.
+                // A change to its permissions changes its ctime, so it will be read again then.
+                // Other errors may be temporary (eg: too many open files), so the file is left
+                // out and will be searched directly.
+                Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
+                    FileSymbols::Found(HashSet::new())
+                }
                 Err(_) => return WalkState::Continue,
             };
-            let symbols = FileSymbols::Found(extract_symbols(&bytes, extractors));
             let _ = tx.send((path.to_string(), stamp, symbols));
             WalkState::Continue
         })
@@ -762,22 +832,20 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
         removed_file_count: old
             .files
             .iter()
-            .filter(|(path, _)| !seen_paths.contains(path))
+            .filter(|file| !seen_paths.contains(&file.path))
             .count(),
         recently_changed_file_count: 0,
     };
-    found_files.retain(|(_, _, file_symbols)| match file_symbols {
-        FileSymbols::Unchanged(_) => true,
-        FileSymbols::Found(_) => {
-            counts.read_file_count += 1;
-            true
+    for (_, _, file_symbols) in &found_files {
+        match file_symbols {
+            FileSymbols::Unchanged(_) => counts.indexed_file_count += 1,
+            FileSymbols::Found(_) => {
+                counts.indexed_file_count += 1;
+                counts.read_file_count += 1;
+            }
+            FileSymbols::TooRecent => counts.recently_changed_file_count += 1,
         }
-        FileSymbols::TooRecent => {
-            counts.recently_changed_file_count += 1;
-            false
-        }
-    });
-    counts.indexed_file_count = found_files.len();
+    }
 
     let mut symbols: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
     for (id, (_, _, file_symbols)) in found_files.iter().enumerate() {
@@ -794,12 +862,15 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
                     symbols.entry(name.as_str()).or_default().push(id);
                 }
             }
-            FileSymbols::TooRecent => unreachable!("Recently changed files were removed"),
+            FileSymbols::TooRecent => {}
         }
     }
-    let files: Vec<(&str, &FileStamp)> = found_files
+    let files: Vec<(&str, &FileStamp, bool)> = found_files
         .iter()
-        .map(|(path, stamp, _)| (path.as_str(), stamp))
+        .map(|(path, stamp, file_symbols)| {
+            let pending = matches!(file_symbols, FileSymbols::TooRecent);
+            (path.as_str(), stamp, pending)
+        })
         .collect();
     write_index(dest, &files, &symbols)?;
     Ok(counts)
@@ -862,7 +933,7 @@ fn extract_symbols(bytes: &[u8], extractors: &query_regex::SymbolExtractors) -> 
 /// a partially written index.
 fn write_index(
     dest: &Path,
-    files: &[(&str, &FileStamp)],
+    files: &[(&str, &FileStamp, bool)],
     symbols: &BTreeMap<&str, Vec<u32>>,
 ) -> io::Result<()> {
     if let Some(parent) = dest.parent() {
@@ -872,11 +943,17 @@ fn write_index(
     let result = (|| {
         let mut out = BufWriter::new(fs::File::create(&tmp)?);
         out.write_all(HEADER)?;
-        for (path, stamp) in files {
+        for (path, stamp, pending) in files {
             writeln!(
                 out,
-                "F {} {} {} {} {} {}",
-                stamp.size, stamp.mtime.0, stamp.mtime.1, stamp.ctime.0, stamp.ctime.1, path
+                "{} {} {} {} {} {} {}",
+                if *pending { 'P' } else { 'F' },
+                stamp.size,
+                stamp.mtime.0,
+                stamp.mtime.1,
+                stamp.ctime.0,
+                stamp.ctime.1,
+                path
             )?;
         }
         for (symbol, ids) in symbols {
@@ -973,7 +1050,7 @@ mod tests {
         let mut paths: Vec<String> = index
             .files
             .iter()
-            .filter(|(_, (id, _))| index.candidates.contains(id))
+            .filter(|(_, (id, _, _))| index.candidates.contains(id))
             .map(|(path, _)| {
                 Path::new(path)
                     .file_name()
@@ -1049,19 +1126,111 @@ mod tests {
         fs::remove_dir_all(&index_dir).unwrap();
     }
 
+    fn refresh_now(config: &Config) -> RefreshCounts {
+        let dest = get_index_path(config).unwrap();
+        let owner = Owner::claim(&dest).unwrap();
+        let counts = refresh(config, &dest, &owner).unwrap();
+        owner.release();
+        counts
+    }
+
+    /// Load the index and check every file the way a search would, returning the files that
+    /// would be searched (by name) and whether the index would then be out of date
+    fn check_like_search(config: &Config) -> (Vec<String>, bool) {
+        let index = load(&get_index_path(config).unwrap(), &config.query).unwrap();
+        let mut searched = vec![];
+        for entry in ignore::WalkBuilder::new(&config.file_paths[0]).build() {
+            let entry = entry.unwrap();
+            let path = entry.path().to_str().unwrap();
+            if file_type::path_matches_file_type(path, &config.file_type)
+                && index.should_search(path, &entry)
+            {
+                searched.push(entry.file_name().to_string_lossy().into());
+            }
+        }
+        searched.sort();
+        (searched, index.is_stale(true))
+    }
+
     #[test]
-    fn refresh_leaves_out_recently_changed_files() {
+    fn recently_changed_files_are_searched_but_only_make_the_index_stale_once_settled() {
         let dir = make_temp_dir("racy-src");
         let index_dir = make_temp_dir("racy-cache");
         fs::write(dir.join("a.php"), "<?php\nfunction foo() {}\n").unwrap();
         let config = make_config("foo", &dir, &index_dir);
-        let dest = get_index_path(&config).unwrap();
-        let owner = Owner::claim(&dest).unwrap();
-        refresh(&config, &dest, &owner).unwrap();
-        let index = load(&dest, "foo").unwrap();
-        assert!(index.files.is_empty());
+
+        let counts = refresh_now(&config);
+        assert_eq!(0, counts.indexed_file_count);
+        assert_eq!(1, counts.recently_changed_file_count);
+        assert_eq!(Vec::<String>::new(), get_indexed_files_for(&config));
+        assert_eq!((vec!["a.php".into()], false), check_like_search(&config));
+
+        // A file that keeps changing (eg: from a build in watch mode) does not make it stale.
+        fs::write(dir.join("a.php"), "<?php\nfunction foo() {}\n// changed\n").unwrap();
+        assert_eq!((vec!["a.php".into()], false), check_like_search(&config));
+
+        // Once it stops changing, it does, so that a refresh can index it.
+        wait_until_files_can_be_indexed();
+        assert_eq!((vec!["a.php".into()], true), check_like_search(&config));
+        let counts = refresh_now(&config);
+        assert_eq!(1, counts.indexed_file_count);
+        assert_eq!(vec!["a.php"], get_indexed_files_for(&config));
+        assert_eq!((vec!["a.php".into()], false), check_like_search(&config));
 
         fs::remove_dir_all(&dir).unwrap();
+        fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_files_are_indexed_without_symbols() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = make_temp_dir("unreadable-src");
+        let index_dir = make_temp_dir("unreadable-cache");
+        fs::write(dir.join("a.php"), "<?php\nfunction foo() {}\n").unwrap();
+        fs::write(dir.join("b.php"), "<?php\nfunction foo() {}\n").unwrap();
+        let unreadable = dir.join("b.php");
+        fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o000)).unwrap();
+        if fs::read(&unreadable).is_ok() {
+            // Running as a user who can read anything (eg: root), so there is nothing to test.
+            return;
+        }
+        wait_until_files_can_be_indexed();
+        let config = make_config("foo", &dir, &index_dir);
+
+        let counts = refresh_now(&config);
+        assert_eq!(2, counts.indexed_file_count);
+        assert_eq!(vec!["a.php"], get_indexed_files_for(&config));
+        assert_eq!((vec!["a.php".into()], false), check_like_search(&config));
+
+        // Making it readable changes its ctime, so it is searched again.
+        fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(
+            (vec!["a.php".into(), "b.php".into()], true),
+            check_like_search(&config)
+        );
+
+        fs::remove_dir_all(&dir).unwrap();
+        fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[test]
+    fn was_refreshed_recently_depends_on_when_the_index_was_written() {
+        let index_dir = make_temp_dir("recent-cache");
+        let dest = index_dir.join("test.idx");
+        assert!(!was_refreshed_recently(&dest));
+
+        fs::write(&dest, HEADER).unwrap();
+        assert!(was_refreshed_recently(&dest));
+
+        let long_ago = SystemTime::now() - MIN_REFRESH_INTERVAL - Duration::from_secs(1);
+        fs::File::options()
+            .write(true)
+            .open(&dest)
+            .unwrap()
+            .set_modified(long_ago)
+            .unwrap();
+        assert!(!was_refreshed_recently(&dest));
         fs::remove_dir_all(&index_dir).unwrap();
     }
 
