@@ -111,9 +111,8 @@ fn is_indexable(path: &str, entry: &DirEntry) -> bool {
 
 /// An index loaded for a single query
 pub struct Index {
-    /// Every indexed file, by path, with its id, the stamp it had when indexed, and whether it is
-    /// pending (see [StoredFile::pending])
-    files: HashMap<String, (u32, FileStamp, bool)>,
+    /// Every indexed file, by path, with its id, the stamp it had when indexed, and its state
+    files: HashMap<String, (u32, FileStamp, FileState)>,
 
     /// When the index was loaded, in nanoseconds since the epoch
     loaded_nanos: i128,
@@ -124,7 +123,7 @@ pub struct Index {
     /// True if the search found a file that is new or has changed since the index was built
     found_changed_file: AtomicBool,
 
-    /// The number of indexed files that the search found unchanged (or pending)
+    /// The number of indexed files that the search found unchanged (or pending, or unreadable)
     unchanged_file_count: AtomicUsize,
 }
 
@@ -134,7 +133,7 @@ impl Index {
         if !is_indexable(path, entry) {
             return true;
         }
-        let Some(&(id, stamp, pending)) = self.files.get(path) else {
+        let Some(&(id, stamp, state)) = self.files.get(path) else {
             self.found_changed_file.store(true, Ordering::Relaxed);
             return true;
         };
@@ -142,24 +141,40 @@ impl Index {
             .metadata()
             .ok()
             .map(|metadata| FileStamp::from_metadata(&metadata));
-        if pending {
-            // A pending file is always searched, but it only makes the index out of date once it
-            // has stopped changing and so can be indexed; otherwise a file that keeps changing
-            // (eg: from a build in watch mode) would start a refresh after every search.
-            self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
-            if current_stamp.is_none_or(|current_stamp| {
-                current_stamp.newest_nanos() < self.loaded_nanos - RACY_WINDOW_NANOS
-            }) {
-                self.found_changed_file.store(true, Ordering::Relaxed);
+        match state {
+            FileState::Pending => {
+                // A pending file is always searched, but it only makes the index out of date once
+                // it has stopped changing and so can be indexed; otherwise a file that keeps
+                // changing (eg: from a build in watch mode) would start a refresh after every
+                // search.
+                self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
+                if current_stamp.is_none_or(|current_stamp| {
+                    current_stamp.newest_nanos() < self.loaded_nanos - RACY_WINDOW_NANOS
+                }) {
+                    self.found_changed_file.store(true, Ordering::Relaxed);
+                }
+                true
             }
-            return true;
-        }
-        if current_stamp == Some(stamp) {
-            self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
-            self.candidates.contains(&id)
-        } else {
-            self.found_changed_file.store(true, Ordering::Relaxed);
-            true
+            FileState::Unreadable => {
+                // An unreadable file is always searched, since it can become readable without its
+                // stamp changing (eg: if the user joins a group, or on Windows, which has no
+                // ctime). It only makes the index out of date if its stamp changes; otherwise it
+                // would start a refresh after every search.
+                if current_stamp == Some(stamp) {
+                    self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    self.found_changed_file.store(true, Ordering::Relaxed);
+                }
+                true
+            }
+            FileState::Indexed if current_stamp == Some(stamp) => {
+                self.unchanged_file_count.fetch_add(1, Ordering::Relaxed);
+                self.candidates.contains(&id)
+            }
+            FileState::Indexed => {
+                self.found_changed_file.store(true, Ordering::Relaxed);
+                true
+            }
         }
     }
 
@@ -592,7 +607,7 @@ fn invalid_data(message: &str) -> io::Error {
 /// F <size> <mtime secs> <mtime nsecs> <ctime secs> <ctime nsecs> <path>
 /// ```
 ///
-/// or, for a pending file (see [StoredFile::pending]), the same but starting with `P`;
+/// or the same starting with `P` for a pending file or `U` for an unreadable one (see [FileState]);
 /// where the line number (starting at 0) is the file id, then one line per symbol:
 ///
 /// ```text
@@ -609,7 +624,7 @@ fn parse_files(data: &[u8]) -> io::Result<(Vec<StoredFile>, &[u8])> {
     while pos < data.len() {
         let end = memchr(b'\n', &data[pos..]).map_or(data.len(), |i| pos + i);
         let line = &data[pos..end];
-        if !line.starts_with(b"F ") && !line.starts_with(b"P ") {
+        if line.get(1) != Some(&b' ') || FileState::from_prefix(line[0]).is_none() {
             break;
         }
         files.push(parse_file_line(line).ok_or_else(|| invalid_data("bad file"))?);
@@ -620,7 +635,7 @@ fn parse_files(data: &[u8]) -> io::Result<(Vec<StoredFile>, &[u8])> {
 
 fn parse_file_line(line: &[u8]) -> Option<StoredFile> {
     let line = std::str::from_utf8(line).ok()?;
-    let pending = line.starts_with('P');
+    let state = FileState::from_prefix(*line.as_bytes().first()?)?;
     let mut fields = line.splitn(7, ' ').skip(1);
     let mut next_number = || fields.next()?.parse::<i64>().ok();
     let stamp = FileStamp {
@@ -631,7 +646,7 @@ fn parse_file_line(line: &[u8]) -> Option<StoredFile> {
     Some(StoredFile {
         path: fields.next()?.to_string(),
         stamp,
-        pending,
+        state,
     })
 }
 
@@ -661,7 +676,7 @@ fn load(path: &Path, query: &str) -> io::Result<Index> {
         files: files
             .into_iter()
             .enumerate()
-            .map(|(id, file)| (file.path, (id as u32, file.stamp, file.pending)))
+            .map(|(id, file)| (file.path, (id as u32, file.stamp, file.state)))
             .collect(),
         loaded_nanos: now_nanos(),
         candidates,
@@ -680,12 +695,45 @@ fn now_nanos() -> i128 {
 struct StoredFile {
     path: String,
     stamp: FileStamp,
+    state: FileState,
+}
 
-    /// True if the file changed too recently to be indexed
+/// Whether a file in an index has its symbols
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FileState {
+    /// The file was read and its symbols are in the index
+    Indexed,
+
+    /// The file changed too recently to be indexed
     ///
-    /// A pending file has no symbols, so it is always searched; it is stored so that a search can
-    /// tell when it has stopped changing (see [Index::should_search]).
-    pending: bool,
+    /// It has no symbols, so it is always searched; it is stored so that a search can tell when
+    /// it has stopped changing (see [Index::should_search]).
+    Pending,
+
+    /// The file could not be read because of its permissions
+    ///
+    /// It has no symbols, so it is always searched; it is stored so that a search does not think
+    /// it is new (see [Index::should_search]).
+    Unreadable,
+}
+
+impl FileState {
+    fn prefix(self) -> char {
+        match self {
+            FileState::Indexed => 'F',
+            FileState::Pending => 'P',
+            FileState::Unreadable => 'U',
+        }
+    }
+
+    fn from_prefix(prefix: u8) -> Option<FileState> {
+        match prefix {
+            b'F' => Some(FileState::Indexed),
+            b'P' => Some(FileState::Pending),
+            b'U' => Some(FileState::Unreadable),
+            _ => None,
+        }
+    }
 }
 
 /// The full contents of an index file, used to refresh it
@@ -736,6 +784,9 @@ enum FileSymbols {
 
     /// The file changed too recently to be indexed, so it will be stored as pending
     TooRecent,
+
+    /// The file could not be read because of its permissions, so it will be stored as unreadable
+    Unreadable,
 }
 
 /// What a refresh did
@@ -797,7 +848,9 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
             };
             if let Some(&old_id) = old_ids.get(path) {
                 let old_file = &old.files[old_id as usize];
-                if !old_file.pending && old_file.stamp == stamp {
+                // Unreadable files are read again in case they have become readable, which does
+                // not always change their stamp.
+                if old_file.state == FileState::Indexed && old_file.stamp == stamp {
                     let _ = tx.send((path.to_string(), stamp, FileSymbols::Unchanged(old_id)));
                     return WalkState::Continue;
                 }
@@ -808,13 +861,12 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
             }
             let symbols = match fs::read(entry.path()) {
                 Ok(bytes) => FileSymbols::Found(extract_symbols(&bytes, extractors)),
-                // A search cannot read the file either, so it defines nothing a search could
-                // find. Leaving it out would make every search think the index is out of date.
-                // A change to its permissions changes its ctime, so it will be read again then.
-                // Other errors may be temporary (eg: too many open files), so the file is left
-                // out and will be searched directly.
+                // Leaving the file out would make every search think the index is out of date,
+                // so it is stored as unreadable, which a search always searches directly. Other
+                // errors may be temporary (eg: too many open files), so the file is left out and
+                // will be searched directly.
                 Err(err) if err.kind() == io::ErrorKind::PermissionDenied => {
-                    FileSymbols::Found(HashSet::new())
+                    FileSymbols::Unreadable
                 }
                 Err(_) => return WalkState::Continue,
             };
@@ -845,7 +897,7 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
     for (_, _, file_symbols) in &found_files {
         match file_symbols {
             FileSymbols::Unchanged(_) => counts.indexed_file_count += 1,
-            FileSymbols::Found(_) => {
+            FileSymbols::Found(_) | FileSymbols::Unreadable => {
                 counts.indexed_file_count += 1;
                 counts.read_file_count += 1;
             }
@@ -868,14 +920,18 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCou
                     symbols.entry(name.as_str()).or_default().push(id);
                 }
             }
-            FileSymbols::TooRecent => {}
+            FileSymbols::TooRecent | FileSymbols::Unreadable => {}
         }
     }
-    let files: Vec<(&str, &FileStamp, bool)> = found_files
+    let files: Vec<(&str, &FileStamp, FileState)> = found_files
         .iter()
         .map(|(path, stamp, file_symbols)| {
-            let pending = matches!(file_symbols, FileSymbols::TooRecent);
-            (path.as_str(), stamp, pending)
+            let state = match file_symbols {
+                FileSymbols::Unchanged(_) | FileSymbols::Found(_) => FileState::Indexed,
+                FileSymbols::TooRecent => FileState::Pending,
+                FileSymbols::Unreadable => FileState::Unreadable,
+            };
+            (path.as_str(), stamp, state)
         })
         .collect();
     write_index(dest, &files, &symbols)?;
@@ -939,7 +995,7 @@ fn extract_symbols(bytes: &[u8], extractors: &query_regex::SymbolExtractors) -> 
 /// a partially written index.
 fn write_index(
     dest: &Path,
-    files: &[(&str, &FileStamp, bool)],
+    files: &[(&str, &FileStamp, FileState)],
     symbols: &BTreeMap<&str, Vec<u32>>,
 ) -> io::Result<()> {
     if let Some(parent) = dest.parent() {
@@ -956,11 +1012,11 @@ fn write_index(
     let result = (|| {
         let mut out = BufWriter::new(fs::File::create(&tmp)?);
         out.write_all(HEADER)?;
-        for (path, stamp, pending) in files {
+        for (path, stamp, state) in files {
             writeln!(
                 out,
                 "{} {} {} {} {} {} {}",
-                if *pending { 'P' } else { 'F' },
+                state.prefix(),
                 stamp.size,
                 stamp.mtime.0,
                 stamp.mtime.1,
@@ -1196,7 +1252,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn unreadable_files_are_indexed_without_symbols() {
+    fn unreadable_files_are_always_searched_but_only_make_the_index_stale_if_changed() {
         use std::os::unix::fs::PermissionsExt;
         let dir = make_temp_dir("unreadable-src");
         let index_dir = make_temp_dir("unreadable-cache");
@@ -1214,9 +1270,13 @@ mod tests {
         let counts = refresh_now(&config);
         assert_eq!(2, counts.indexed_file_count);
         assert_eq!(vec!["a.php"], get_indexed_files_for(&config));
-        assert_eq!((vec!["a.php".into()], false), check_like_search(&config));
+        // It could become readable without its stamp changing, so it is still searched.
+        assert_eq!(
+            (vec!["a.php".into(), "b.php".into()], false),
+            check_like_search(&config)
+        );
 
-        // Making it readable changes its ctime, so it is searched again.
+        // Making it readable changes its ctime, so a refresh will index it.
         fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o644)).unwrap();
         assert_eq!(
             (vec!["a.php".into(), "b.php".into()], true),
@@ -1317,7 +1377,12 @@ mod tests {
                     let symbol = format!("symbol_{thread_number}");
                     let symbols = BTreeMap::from([(symbol.as_str(), vec![0])]);
                     for _ in 0..50 {
-                        write_index(dest, &[(path.as_str(), stamp, false)], &symbols).unwrap();
+                        write_index(
+                            dest,
+                            &[(path.as_str(), stamp, FileState::Indexed)],
+                            &symbols,
+                        )
+                        .unwrap();
                     }
                 });
             }
