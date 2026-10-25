@@ -537,7 +537,7 @@ pub fn remove_all_indexes(index_dir: Option<&str>) -> io::Result<(PathBuf, usize
 /// Return the kind (`idx`, `owner`, or `tmp`) of a file name created by this module, if it is one
 ///
 /// The index directory could be shared with other files, so only files with these exact names are
-/// ever removed: `<hash>.idx`, `<hash>.owner`, or `<hash>.<pid>.tmp`.
+/// ever removed: `<hash>.idx`, `<hash>.owner`, or `<hash>.<pid>-<count>.tmp`.
 fn get_index_file_kind(name: &str) -> Option<&str> {
     let (hash, rest) = name.split_once('.')?;
     if hash.len() != 16 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -545,11 +545,17 @@ fn get_index_file_kind(name: &str) -> Option<&str> {
     }
     match rest.split_once('.') {
         None if rest == "idx" || rest == "owner" => Some(rest),
-        Some((pid, "tmp")) if !pid.is_empty() && pid.bytes().all(|b| b.is_ascii_digit()) => {
-            Some("tmp")
-        }
+        Some((id, "tmp")) if is_temp_file_id(id) => Some("tmp"),
         _ => None,
     }
+}
+
+fn is_temp_file_id(id: &str) -> bool {
+    let Some((pid, count)) = id.split_once('-') else {
+        return false;
+    };
+    let is_number = |text: &str| !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit());
+    is_number(pid) && is_number(count)
 }
 
 fn get_default_index_dir() -> Option<PathBuf> {
@@ -939,7 +945,14 @@ fn write_index(
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
     }
-    let tmp = dest.with_extension(format!("{}.tmp", std::process::id()));
+    // The process id alone is not unique: a program using this crate could refresh the same index
+    // on two threads, and both could pass their last check-in before writing.
+    static WRITE_COUNT: AtomicUsize = AtomicUsize::new(0);
+    let tmp = dest.with_extension(format!(
+        "{}-{}.tmp",
+        std::process::id(),
+        WRITE_COUNT.fetch_add(1, Ordering::Relaxed)
+    ));
     let result = (|| {
         let mut out = BufWriter::new(fs::File::create(&tmp)?);
         out.write_all(HEADER)?;
@@ -1260,7 +1273,8 @@ mod tests {
         let dest = index_dir.join("0123456789abcdef.idx");
         fs::write(&dest, HEADER).unwrap();
         fs::write(index_dir.join("fedcba9876543210.idx"), HEADER).unwrap();
-        fs::write(index_dir.join("0123456789abcdef.123.tmp"), "").unwrap();
+        fs::write(index_dir.join("0123456789abcdef.123-4.tmp"), "").unwrap();
+        fs::write(index_dir.join("0123456789abcdef.123-.tmp"), "").unwrap();
         fs::write(index_dir.join("notes.txt"), "").unwrap();
         fs::write(index_dir.join("0123456789abcdef.txt"), "").unwrap();
         let owner = Owner::claim(&dest).unwrap();
@@ -1273,9 +1287,47 @@ mod tests {
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into())
             .collect();
         remaining.sort();
-        assert_eq!(vec!["0123456789abcdef.txt", "notes.txt"], remaining);
+        assert_eq!(
+            vec![
+                "0123456789abcdef.123-.tmp",
+                "0123456789abcdef.txt",
+                "notes.txt"
+            ],
+            remaining
+        );
         assert!(!owner.check_in());
 
+        fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[test]
+    fn write_index_from_many_threads_never_mixes_writes() {
+        let index_dir = make_temp_dir("write-cache");
+        let dest = index_dir.join("0123456789abcdef.idx");
+        let stamp = FileStamp {
+            size: 1,
+            mtime: (1, 1),
+            ctime: (1, 1),
+        };
+        thread::scope(|scope| {
+            for thread_number in 0..8 {
+                let (dest, stamp) = (&dest, &stamp);
+                scope.spawn(move || {
+                    let path = format!("file-{thread_number}.php");
+                    let symbol = format!("symbol_{thread_number}");
+                    let symbols = BTreeMap::from([(symbol.as_str(), vec![0])]);
+                    for _ in 0..50 {
+                        write_index(dest, &[(path.as_str(), stamp, false)], &symbols).unwrap();
+                    }
+                });
+            }
+        });
+        let stored = load_stored(&dest).unwrap();
+        assert_eq!(1, stored.files.len());
+        let thread_number = stored.files[0].path.strip_prefix("file-").unwrap();
+        let thread_number = thread_number.strip_suffix(".php").unwrap();
+        assert_eq!(vec![format!("symbol_{thread_number}")], stored.symbol_names);
+        assert_eq!(1, fs::read_dir(&index_dir).unwrap().count());
         fs::remove_dir_all(&index_dir).unwrap();
     }
 
