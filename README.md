@@ -39,6 +39,8 @@ Disable colors in output (color is always disabled if not printing to STDOUT).
 
 (Experimental) Keep an index of which files define which symbols, stored in your user cache directory, and use it to skip reading files that have not changed and do not define the symbol. Results are always the same as without the index; files that are new or changed since the index was built are always searched. After a search finds that the index is missing or out of date, grepdef updates it in a low-priority background process, so searches are never slowed down by indexing.
 
+This can also be enabled by setting the `GREPDEF_INDEX` environment variable (eg: `GREPDEF_INDEX=1`), which is useful for editor integrations.
+
 -h, --help
 
 Print help and usage text.

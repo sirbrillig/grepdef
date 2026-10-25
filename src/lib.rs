@@ -136,7 +136,14 @@ pub struct Args {
     pub format: Option<SearchResultFormat>,
 
     /// (Experimental) Use an index to skip files that have not changed and do not define the symbol
-    #[arg(long = "index")]
+    ///
+    /// Can also be enabled by setting the `GREPDEF_INDEX` environment variable to any value other
+    /// than an empty string, `0`, `false`, `no`, or `off`.
+    #[arg(
+        long = "index",
+        env = "GREPDEF_INDEX",
+        value_parser = clap::builder::FalseyValueParser::new()
+    )]
     pub index: bool,
 
     /// (Advanced) The directory in which to store indexes; defaults to the user cache directory
