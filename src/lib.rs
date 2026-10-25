@@ -58,6 +58,7 @@ use serde::Serialize;
 use std::error::Error;
 use std::fs;
 use std::num::NonZero;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time;
@@ -141,6 +142,17 @@ pub struct Args {
     /// (Advanced) The directory in which to store indexes; defaults to the user cache directory
     #[arg(long = "index-dir", hide = true)]
     pub index_dir: Option<String>,
+
+    /// (Internal) Refresh the index instead of searching; used by the background refresh process
+    #[arg(long = "background-index-refresh", hide = true)]
+    pub background_index_refresh: bool,
+
+    /// The grepdef executable to run to refresh the index in the background
+    ///
+    /// If not set, an out of date index is refreshed before the search returns. The CLI sets this
+    /// to itself.
+    #[arg(skip)]
+    pub index_refresh_command: Option<PathBuf>,
 }
 
 impl Args {
@@ -229,6 +241,12 @@ struct Config {
 
     /// The directory in which to store indexes
     index_dir: Option<String>,
+
+    /// Refresh the index instead of searching if true
+    background_index_refresh: bool,
+
+    /// The executable to run to refresh the index in the background
+    index_refresh_command: Option<PathBuf>,
 }
 
 impl Config {
@@ -270,6 +288,8 @@ impl Config {
             format: args.format.unwrap_or_default(),
             use_index: args.index,
             index_dir: args.index_dir,
+            background_index_refresh: args.background_index_refresh,
+            index_refresh_command: args.index_refresh_command,
         };
         debug(&config, format!("Created config {:?}", config).as_str());
         Ok(config)
@@ -591,6 +611,10 @@ impl Searcher {
         } else {
             None
         };
+        if self.config.background_index_refresh {
+            index::run_background_refresh(&self.config)?;
+            return Ok(());
+        }
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let config = Arc::new(self.config.clone());
 
@@ -630,6 +654,7 @@ impl Searcher {
             let searched_file_count_walk = Arc::clone(&searched_file_count);
             let config_walk = Arc::clone(&config);
             let re_walk = re.clone();
+            let index_walk = index.clone();
 
             std::thread::spawn(move || {
                 let Some(builder) = make_walk_builder(&config_walk) else {
@@ -646,7 +671,7 @@ impl Searcher {
                     let config = Arc::clone(&config_walk);
                     let should_quit = Arc::clone(&should_quit_walk);
                     let searched_file_count = Arc::clone(&searched_file_count_walk);
-                    let index = index.clone();
+                    let index = index_walk.clone();
                     // Build the memmem Finder once per thread rather than once per file.
                     let finder = memmem::Finder::new(config.query.as_bytes()).into_owned();
 
@@ -715,6 +740,11 @@ impl Searcher {
                     }
                 }
             }
+        }
+
+        if config.use_index {
+            let walked_all_files = !should_quit.load(Ordering::Relaxed);
+            index::refresh_if_needed(&config, index.as_deref(), walked_all_files);
         }
 
         // Don't try to even calculate elapsed time if we are not going to print it

@@ -4,7 +4,9 @@ use grepdef::Searcher;
 use std::process;
 
 fn main() {
-    let searcher = Searcher::new(Args::parse()).unwrap_or_else(|err| {
+    let mut args = Args::parse();
+    args.index_refresh_command = std::env::current_exe().ok();
+    let searcher = Searcher::new(args).unwrap_or_else(|err| {
         eprintln!("{err}");
         process::exit(exitcode::USAGE);
     });

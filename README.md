@@ -37,7 +37,7 @@ Disable colors in output (color is always disabled if not printing to STDOUT).
 
 --index
 
-(Experimental) Keep an index of which files define which symbols, stored in your user cache directory, and use it to skip reading files that have not changed and do not define the symbol. The first search with this option builds the index, which takes a little longer than a normal search. Results are always the same as without the index; files that are new or changed since the index was built are always searched.
+(Experimental) Keep an index of which files define which symbols, stored in your user cache directory, and use it to skip reading files that have not changed and do not define the symbol. Results are always the same as without the index; files that are new or changed since the index was built are always searched. After a search finds that the index is missing or out of date, grepdef updates it in a low-priority background process, so searches are never slowed down by indexing.
 
 -h, --help
 

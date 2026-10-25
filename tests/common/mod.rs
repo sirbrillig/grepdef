@@ -22,6 +22,8 @@ pub fn make_args(
         format: None,
         index: false,
         index_dir: None,
+        background_index_refresh: false,
+        index_refresh_command: None,
     }
 }
 
