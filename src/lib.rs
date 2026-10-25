@@ -58,6 +58,7 @@ use serde::Serialize;
 use std::error::Error;
 use std::fs;
 use std::num::NonZero;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time;
@@ -65,7 +66,10 @@ use strum_macros::Display;
 use strum_macros::EnumString;
 
 mod file_type;
+mod index;
 mod query_regex;
+
+pub use index::{remove_all_indexes, IndexUpdate};
 
 /// The command-line arguments to be used by [Searcher]
 ///
@@ -92,6 +96,10 @@ mod query_regex;
 )]
 pub struct Args {
     /// (Required) The symbol name (function, class, etc.) to search for
+    #[arg(
+        required_unless_present_any = ["clear_indexes", "update_index"],
+        default_value = ""
+    )]
     pub query: String,
 
     /// The file path(s) to search; recursively searches directories and respects .gitignore
@@ -132,6 +140,45 @@ pub struct Args {
     /// The output format; defaults to 'grep'
     #[arg(long = "format")]
     pub format: Option<SearchResultFormat>,
+
+    /// (Experimental) Use an index to skip files that have not changed and do not define the symbol
+    ///
+    /// Can also be enabled by setting the `GREPDEF_INDEX` environment variable to any value other
+    /// than an empty string, `0`, `false`, `no`, or `off`.
+    #[arg(
+        long = "index",
+        env = "GREPDEF_INDEX",
+        value_parser = clap::builder::FalseyValueParser::new()
+    )]
+    pub index: bool,
+
+    /// (Advanced) The directory in which to store indexes; defaults to the user cache directory
+    #[arg(long = "index-dir", hide = true)]
+    pub index_dir: Option<String>,
+
+    /// Remove all indexes so that each is rebuilt by the next search that uses it
+    ///
+    /// The query is optional with this option; if one is provided, it is searched for afterward.
+    #[arg(long = "clear-indexes")]
+    pub clear_indexes: bool,
+
+    /// Update the index for the file paths and file type now, without searching
+    ///
+    /// With this option there is no query, so every positional argument is a file path. The paths,
+    /// file type, and working directory must be the same as the searches that should use the index.
+    #[arg(long = "update-index")]
+    pub update_index: bool,
+
+    /// (Internal) Refresh the index instead of searching; used by the background refresh process
+    #[arg(long = "background-index-refresh", hide = true)]
+    pub background_index_refresh: bool,
+
+    /// The grepdef executable to run to refresh the index in the background
+    ///
+    /// If not set, an out of date index is refreshed before the search returns. The CLI sets this
+    /// to itself.
+    #[arg(skip)]
+    pub index_refresh_command: Option<PathBuf>,
 }
 
 impl Args {
@@ -214,6 +261,18 @@ struct Config {
 
     /// The output format
     format: SearchResultFormat,
+
+    /// Use an index to skip files if true
+    use_index: bool,
+
+    /// The directory in which to store indexes
+    index_dir: Option<String>,
+
+    /// Refresh the index instead of searching if true
+    background_index_refresh: bool,
+
+    /// The executable to run to refresh the index in the background
+    index_refresh_command: Option<PathBuf>,
 }
 
 impl Config {
@@ -223,7 +282,15 @@ impl Config {
             let args_formatted = format!("Creating config with args {:?}", args);
             println!("{}", args_formatted.yellow());
         }
-        let file_paths = match args.file_path {
+        // With --update-index there is no query, so every positional argument is a path.
+        let (query, file_path) = if args.update_index && !args.query.is_empty() {
+            let mut file_paths = vec![args.query];
+            file_paths.extend(args.file_path.unwrap_or_default());
+            (String::new(), Some(file_paths))
+        } else {
+            (args.query, args.file_path)
+        };
+        let file_paths = match file_path {
             Some(file_path) => file_path,
             None => vec![".".into()],
         };
@@ -242,7 +309,7 @@ impl Config {
         };
 
         let config = Config {
-            query: args.query,
+            query,
             file_paths,
             file_type,
             line_number: args.line_number,
@@ -253,6 +320,10 @@ impl Config {
             limit: args.limit,
             num_threads,
             format: args.format.unwrap_or_default(),
+            use_index: args.index,
+            index_dir: args.index_dir,
+            background_index_refresh: args.background_index_refresh,
+            index_refresh_command: args.index_refresh_command,
         };
         debug(&config, format!("Created config {:?}", config).as_str());
         Ok(config)
@@ -526,6 +597,13 @@ impl Searcher {
         Ok(Searcher { config })
     }
 
+    /// Update the index now, without searching
+    ///
+    /// See [Args::update_index].
+    pub fn update_index(&self) -> Result<IndexUpdate, Box<dyn Error>> {
+        Ok(index::update(&self.config)?)
+    }
+
     /// Perform the search and return formatted strings
     pub fn search_and_format(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let mut results: Vec<String> = vec![];
@@ -574,6 +652,10 @@ impl Searcher {
         } else {
             None
         };
+        if self.config.background_index_refresh {
+            index::run_background_refresh(&self.config)?;
+            return Ok(());
+        }
         let re = query_regex::get_regex_for_query(&self.config.query, &self.config.file_type);
         let config = Arc::new(self.config.clone());
 
@@ -584,6 +666,21 @@ impl Searcher {
         }
         if config.no_color {
             colored::control::set_override(false);
+        }
+
+        let index = if config.use_index {
+            index::prepare(&config).map(Arc::new)
+        } else {
+            None
+        };
+        if let Some(index) = &index {
+            self.debug(
+                format!(
+                    "Index lists {} files defining the query",
+                    index.candidate_count()
+                )
+                .as_str(),
+            );
         }
 
         self.debug("Starting searchers");
@@ -598,18 +695,12 @@ impl Searcher {
             let searched_file_count_walk = Arc::clone(&searched_file_count);
             let config_walk = Arc::clone(&config);
             let re_walk = re.clone();
+            let index_walk = index.clone();
 
             std::thread::spawn(move || {
-                if config_walk.file_paths.is_empty() {
+                let Some(builder) = make_walk_builder(&config_walk) else {
                     return;
-                }
-                // WalkBuilder::new() requires an initial path, so seed it with
-                // the first and add the rest.
-                let mut builder = WalkBuilder::new(&config_walk.file_paths[0]);
-                for fp in config_walk.file_paths.iter().skip(1) {
-                    builder.add(fp);
-                }
-                builder.threads(config_walk.num_threads.get());
+                };
 
                 // run() uses a two-level closure: the outer closure is called once
                 // per walk thread to set up per-thread state (cloning shared values),
@@ -621,6 +712,7 @@ impl Searcher {
                     let config = Arc::clone(&config_walk);
                     let should_quit = Arc::clone(&should_quit_walk);
                     let searched_file_count = Arc::clone(&searched_file_count_walk);
+                    let index = index_walk.clone();
                     // Build the memmem Finder once per thread rather than once per file.
                     let finder = memmem::Finder::new(config.query.as_bytes()).into_owned();
 
@@ -632,7 +724,15 @@ impl Searcher {
                             Ok(e) => e,
                             Err(_) => return WalkState::Continue,
                         };
-                        if entry.path().is_dir() {
+                        // Checking the file type from the directory listing avoids a stat call,
+                        // which makes indexed searches (which only stat most files) much faster.
+                        // Oddly, it makes full searches slower (perhaps from more contention when
+                        // opening files), so they keep the stat.
+                        let is_dir = match index {
+                            Some(_) => entry.file_type().is_some_and(|ft| ft.is_dir()),
+                            None => entry.path().is_dir(),
+                        };
+                        if is_dir {
                             return WalkState::Continue;
                         }
                         let path_str = match entry.path().to_str() {
@@ -641,6 +741,11 @@ impl Searcher {
                         };
                         if !file_type::path_matches_file_type(&path_str, &config.file_type) {
                             return WalkState::Continue;
+                        }
+                        if let Some(index) = &index {
+                            if !index.should_search(&path_str, &entry) {
+                                return WalkState::Continue;
+                            }
                         }
                         searched_file_count.fetch_add(1, Ordering::Relaxed);
                         let tx_file = tx.clone();
@@ -678,6 +783,11 @@ impl Searcher {
             }
         }
 
+        if config.use_index {
+            let walked_all_files = !should_quit.load(Ordering::Relaxed);
+            index::refresh_if_needed(&config, index.as_deref(), walked_all_files);
+        }
+
         // Don't try to even calculate elapsed time if we are not going to print it
         if let (true, Some(start)) = (config.debug, start) {
             self.debug(
@@ -709,14 +819,30 @@ impl Searcher {
     }
 }
 
+/// Create a walker for all the file paths of a search; returns None if there are no paths
+fn make_walk_builder(config: &Config) -> Option<WalkBuilder> {
+    // WalkBuilder::new() requires an initial path, so seed it with the first and add the rest.
+    let mut builder = WalkBuilder::new(config.file_paths.first()?);
+    for file_path in config.file_paths.iter().skip(1) {
+        builder.add(file_path);
+    }
+    builder.threads(config.num_threads.get());
+    Some(builder)
+}
+
 fn debug(config: &Config, output: &str) {
     if config.debug {
         println!("{}", output.yellow());
     }
 }
 
-fn search_file<F>(re: &Regex, file_path: &str, config: &Config, finder: &memmem::Finder<'_>, callback: F)
-where
+fn search_file<F>(
+    re: &Regex,
+    file_path: &str,
+    config: &Config,
+    finder: &memmem::Finder<'_>,
+    callback: F,
+) where
     F: FnOnce(Vec<SearchResult>) + Send + 'static,
 {
     debug(config, format!("Scanning file {}", file_path).as_str());

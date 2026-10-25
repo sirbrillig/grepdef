@@ -307,6 +307,7 @@ dependencies = [
  "crossbeam-channel",
  "exitcode",
  "ignore",
+ "libc",
  "memchr",
  "memmap2",
  "regex",

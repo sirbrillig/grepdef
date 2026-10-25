@@ -24,10 +24,7 @@ pub fn guess_file_type_from_file_path(file_path: &str) -> Option<FileType> {
         if path.is_dir() {
             continue;
         }
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         match ext {
             "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" => return Some(FileType::JS),
             "php" => return Some(FileType::PHP),

@@ -35,6 +35,20 @@ Include the line numbers of matches (equivalent to the grep or rg option).
 
 Disable colors in output (color is always disabled if not printing to STDOUT).
 
+--index
+
+(Experimental) Keep an index of which files define which symbols, stored in your user cache directory, and use it to skip reading files that have not changed and do not define the symbol. Results are always the same as without the index; files that are new or changed since the index was built are always searched. After a search finds that the index is missing or out of date, grepdef updates it in a low-priority background process, so searches are never slowed down by indexing.
+
+This can also be enabled by setting the `GREPDEF_INDEX` environment variable (eg: `GREPDEF_INDEX=1`), which is useful for editor integrations.
+
+--clear-indexes
+
+Remove all indexes so that each is rebuilt by the next search that uses it. Use this if an index ever seems to be wrong. The query is optional with this option; if one is provided, it is searched for afterward.
+
+--update-index
+
+Update the index now without searching, like running ctags. With this option there is no query, so every positional argument is a file path (eg: `grepdef --update-index --type php .`). The file paths, file type, and working directory must be the same as the searches that should use the index. Combine with `--clear-indexes` to rebuild the index from scratch.
+
 -h, --help
 
 Print help and usage text.
