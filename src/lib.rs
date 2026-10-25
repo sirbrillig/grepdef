@@ -69,7 +69,7 @@ mod file_type;
 mod index;
 mod query_regex;
 
-pub use index::remove_all_indexes;
+pub use index::{remove_all_indexes, IndexUpdate};
 
 /// The command-line arguments to be used by [Searcher]
 ///
@@ -96,7 +96,10 @@ pub use index::remove_all_indexes;
 )]
 pub struct Args {
     /// (Required) The symbol name (function, class, etc.) to search for
-    #[arg(required_unless_present = "clear_indexes", default_value = "")]
+    #[arg(
+        required_unless_present_any = ["clear_indexes", "update_index"],
+        default_value = ""
+    )]
     pub query: String,
 
     /// The file path(s) to search; recursively searches directories and respects .gitignore
@@ -158,6 +161,13 @@ pub struct Args {
     /// The query is optional with this option; if one is provided, it is searched for afterward.
     #[arg(long = "clear-indexes")]
     pub clear_indexes: bool,
+
+    /// Update the index for the file paths and file type now, without searching
+    ///
+    /// With this option there is no query, so every positional argument is a file path. The paths,
+    /// file type, and working directory must be the same as the searches that should use the index.
+    #[arg(long = "update-index")]
+    pub update_index: bool,
 
     /// (Internal) Refresh the index instead of searching; used by the background refresh process
     #[arg(long = "background-index-refresh", hide = true)]
@@ -272,7 +282,15 @@ impl Config {
             let args_formatted = format!("Creating config with args {:?}", args);
             println!("{}", args_formatted.yellow());
         }
-        let file_paths = match args.file_path {
+        // With --update-index there is no query, so every positional argument is a path.
+        let (query, file_path) = if args.update_index && !args.query.is_empty() {
+            let mut file_paths = vec![args.query];
+            file_paths.extend(args.file_path.unwrap_or_default());
+            (String::new(), Some(file_paths))
+        } else {
+            (args.query, args.file_path)
+        };
+        let file_paths = match file_path {
             Some(file_path) => file_path,
             None => vec![".".into()],
         };
@@ -291,7 +309,7 @@ impl Config {
         };
 
         let config = Config {
-            query: args.query,
+            query,
             file_paths,
             file_type,
             line_number: args.line_number,
@@ -577,6 +595,13 @@ impl Searcher {
     pub fn new(args: Args) -> Result<Searcher, String> {
         let config = Config::new(args)?;
         Ok(Searcher { config })
+    }
+
+    /// Update the index now, without searching
+    ///
+    /// See [Args::update_index].
+    pub fn update_index(&self) -> Result<IndexUpdate, Box<dyn Error>> {
+        Ok(index::update(&self.config)?)
     }
 
     /// Perform the search and return formatted strings

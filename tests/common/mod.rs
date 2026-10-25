@@ -23,6 +23,7 @@ pub fn make_args(
         index: false,
         index_dir: None,
         clear_indexes: false,
+        update_index: false,
         background_index_refresh: false,
         index_refresh_command: None,
     }

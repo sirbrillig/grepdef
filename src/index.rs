@@ -47,6 +47,9 @@ const CHECK_IN_INTERVAL: usize = 256;
 /// A refresh that has not checked in for this long is assumed to have crashed or hung
 const CHECK_IN_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The most times an update will walk the files while waiting to index recently changed ones
+const MAX_UPDATE_PASSES: usize = 3;
+
 /// A background refresh exits after this long no matter what, in case it is stuck
 const BACKGROUND_REFRESH_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
@@ -223,7 +226,7 @@ pub fn refresh_if_needed(config: &Config, index: Option<&Index>, walked_all_file
                 result
             });
             match result {
-                Ok(()) => debug(
+                Ok(_) => debug(
                     config,
                     format!("Refreshed index in {} ms", start.elapsed().as_millis()).as_str(),
                 ),
@@ -292,6 +295,62 @@ pub fn run_background_refresh(config: &Config) -> io::Result<()> {
     let dest = get_index_path(config).ok_or_else(|| invalid_data("no index path"))?;
     let owner = Owner::claim(&dest)?;
     let result = refresh(config, &dest, &owner);
+    owner.release();
+    result.map(|_| ())
+}
+
+/// The result of [crate::Searcher::update_index]
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndexUpdate {
+    /// The index file that was updated
+    pub index_path: PathBuf,
+
+    /// The number of files in the index
+    pub indexed_file_count: usize,
+
+    /// The number of files that were new or changed and so were read
+    pub read_file_count: usize,
+
+    /// The number of files that were removed from the index because they no longer exist
+    pub removed_file_count: usize,
+
+    /// The number of files that kept changing too recently to be indexed
+    ///
+    /// These will be searched directly until they are indexed by a later refresh or update.
+    pub recently_changed_file_count: usize,
+}
+
+/// Bring the index for a search up to date now, without searching
+///
+/// Unlike a background refresh, this does not leave out files that changed too recently to be
+/// indexed: it waits until their timestamps can be trusted and then indexes them, unless they
+/// keep changing.
+pub fn update(config: &Config) -> io::Result<IndexUpdate> {
+    let dest = get_index_path(config).ok_or_else(|| invalid_data("no index path"))?;
+    let owner = Owner::claim(&dest)?;
+    let result = (|| {
+        let mut update = IndexUpdate {
+            index_path: dest.clone(),
+            indexed_file_count: 0,
+            read_file_count: 0,
+            removed_file_count: 0,
+            recently_changed_file_count: 0,
+        };
+        for pass in 0..MAX_UPDATE_PASSES {
+            if pass > 0 {
+                thread::sleep(Duration::from_nanos(RACY_WINDOW_NANOS as u64 + 100_000_000));
+            }
+            let counts = refresh(config, &dest, &owner)?;
+            update.indexed_file_count = counts.indexed_file_count;
+            update.read_file_count += counts.read_file_count;
+            update.removed_file_count += counts.removed_file_count;
+            update.recently_changed_file_count = counts.recently_changed_file_count;
+            if counts.recently_changed_file_count == 0 {
+                break;
+            }
+        }
+        Ok(update)
+    })();
     owner.release();
     result
 }
@@ -604,13 +663,24 @@ enum FileSymbols {
 
     /// The file is new or changed and these are its symbols
     Found(HashSet<String>),
+
+    /// The file changed too recently to be indexed
+    TooRecent,
+}
+
+/// What a refresh did
+struct RefreshCounts {
+    indexed_file_count: usize,
+    read_file_count: usize,
+    removed_file_count: usize,
+    recently_changed_file_count: usize,
 }
 
 /// Walk all the files for a search and write an index of the symbols they define
 ///
 /// Files which are unchanged in the existing index (if there is one) keep their symbols; the rest
 /// are read. Files which no longer exist are dropped.
-fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<()> {
+fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<RefreshCounts> {
     let start_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos() as i128);
@@ -664,6 +734,7 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<()> {
                 }
             }
             if stamp.newest_nanos() >= start_nanos - RACY_WINDOW_NANOS {
+                let _ = tx.send((path.to_string(), stamp, FileSymbols::TooRecent));
                 return WalkState::Continue;
             }
             let bytes = match fs::read(entry.path()) {
@@ -685,6 +756,28 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<()> {
     // Overlapping search paths could find the same file twice.
     let mut seen_paths = HashSet::new();
     found_files.retain(|(path, _, _)| seen_paths.insert(path.clone()));
+    let mut counts = RefreshCounts {
+        indexed_file_count: 0,
+        read_file_count: 0,
+        removed_file_count: old
+            .files
+            .iter()
+            .filter(|(path, _)| !seen_paths.contains(path))
+            .count(),
+        recently_changed_file_count: 0,
+    };
+    found_files.retain(|(_, _, file_symbols)| match file_symbols {
+        FileSymbols::Unchanged(_) => true,
+        FileSymbols::Found(_) => {
+            counts.read_file_count += 1;
+            true
+        }
+        FileSymbols::TooRecent => {
+            counts.recently_changed_file_count += 1;
+            false
+        }
+    });
+    counts.indexed_file_count = found_files.len();
 
     let mut symbols: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
     for (id, (_, _, file_symbols)) in found_files.iter().enumerate() {
@@ -701,13 +794,15 @@ fn refresh(config: &Config, dest: &Path, owner: &Owner) -> io::Result<()> {
                     symbols.entry(name.as_str()).or_default().push(id);
                 }
             }
+            FileSymbols::TooRecent => unreachable!("Recently changed files were removed"),
         }
     }
     let files: Vec<(&str, &FileStamp)> = found_files
         .iter()
         .map(|(path, stamp, _)| (path.as_str(), stamp))
         .collect();
-    write_index(dest, &files, &symbols)
+    write_index(dest, &files, &symbols)?;
+    Ok(counts)
 }
 
 /// Find every symbol that the definition patterns could match in a file
@@ -924,6 +1019,31 @@ mod tests {
             get_indexed_files_for(&config)
         );
         assert!(!get_owner_path(&dest).exists());
+
+        fs::remove_dir_all(&dir).unwrap();
+        fs::remove_dir_all(&index_dir).unwrap();
+    }
+
+    #[test]
+    fn update_waits_to_index_recently_changed_files() {
+        let dir = make_temp_dir("update-src");
+        let index_dir = make_temp_dir("update-cache");
+        fs::write(dir.join("a.php"), "<?php\nfunction foo() {}\n").unwrap();
+        let config = make_config("", &dir, &index_dir);
+
+        let update = update(&config).unwrap();
+        assert_eq!(get_index_path(&config).unwrap(), update.index_path);
+        assert_eq!(1, update.indexed_file_count);
+        assert_eq!(1, update.read_file_count);
+        assert_eq!(0, update.recently_changed_file_count);
+        let config = make_config("foo", &dir, &index_dir);
+        assert_eq!(vec!["a.php"], get_indexed_files_for(&config));
+        assert!(!get_owner_path(&update.index_path).exists());
+
+        fs::remove_file(dir.join("a.php")).unwrap();
+        let update = super::update(&config).unwrap();
+        assert_eq!(0, update.indexed_file_count);
+        assert_eq!(1, update.removed_file_count);
 
         fs::remove_dir_all(&dir).unwrap();
         fs::remove_dir_all(&index_dir).unwrap();
